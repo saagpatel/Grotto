@@ -1,0 +1,80 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "build-svc"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "spans": [
+            {
+              "traceId": "AAECAwQFBgcICQoLDA0ODw==",
+              "spanId": "oKGio6Slpqc=",
+              "name": "build",
+              "kind": "SPAN_KIND_INTERNAL",
+              "endTimeUnixNano": "600",
+              "attributes": [
+                {
+                  "key": "command",
+                  "value": {
+                    "stringValue": "make all"
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_OK"
+              }
+            },
+            {
+              "traceId": "AAECAwQFBgcICQoLDA0ODw==",
+              "spanId": "sLGys7S1trc=",
+              "parentSpanId": "oKGio6Slpqc=",
+              "name": "compile",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "10",
+              "endTimeUnixNano": "200",
+              "attributes": [
+                {
+                  "key": "jobs",
+                  "value": {
+                    "intValue": "8"
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_OK"
+              }
+            },
+            {
+              "traceId": "AAECAwQFBgcICQoLDA0ODw==",
+              "spanId": "wMHCw8TFxsc=",
+              "parentSpanId": "oKGio6Slpqc=",
+              "name": "link",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "210",
+              "endTimeUnixNano": "400",
+              "attributes": [
+                {
+                  "key": "cached",
+                  "value": {
+                    "boolValue": false
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_ERROR"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

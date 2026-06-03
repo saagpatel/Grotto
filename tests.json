@@ -71,20 +71,32 @@
 		],
 		"2": [
 			{
-				"test": "otlp.mapproto: three-span-trace.json -> 3 spans, attrs + parents preserved",
-				"status": "planned"
+				"test": "otlp.mapproto: 3-span request -> 3 spans, attrs typed (str/int/bool), parents intact",
+				"status": "passing"
 			},
 			{
-				"test": "otlp.grpc: otel-cli export lands a trace with source=otlp",
-				"status": "planned"
+				"test": "otlp.mapproto: spans grouped by trace ID; empty request -> no traces",
+				"status": "passing"
 			},
 			{
-				"test": "otlp.http: POST /v1/traces protobuf body stores a trace",
-				"status": "planned"
+				"test": "otlp.grpc: bufconn Export stores trace with source=otlp",
+				"status": "passing"
 			},
 			{
-				"test": "store: 200-span export, zero database-locked errors across 10 runs",
-				"status": "planned"
+				"test": "otlp.http: POST /v1/traces protobuf + JSON fixture stores a trace",
+				"status": "passing"
+			},
+			{
+				"test": "otlp: gRPC and HTTP ingest of same request yield identical trees",
+				"status": "passing"
+			},
+			{
+				"test": "store: 200-span export, exactly 200 spans, zero lock errors across 10 runs",
+				"status": "passing"
+			},
+			{
+				"test": "otlp.serve: warns when bound to a non-loopback address",
+				"status": "passing"
 			}
 		],
 		"3": [

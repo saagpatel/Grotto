@@ -1,7 +1,7 @@
 {
 	"project": "grotto",
 	"module": "github.com/saagpatel/grotto",
-	"current_phase": 1,
+	"current_phase": 2,
 	"phases": [
 		{
 			"phase": 0,
@@ -61,8 +61,29 @@
 		{
 			"phase": 2,
 			"name": "OTLP Receiver (gRPC + HTTP)",
-			"status": "pending",
-			"tasks": []
+			"status": "done",
+			"tasks": [
+				{
+					"id": "2.1",
+					"name": "otlp/grpc.go TraceService server",
+					"status": "done"
+				},
+				{
+					"id": "2.2",
+					"name": "otlp/mapproto.go proto spans -> model.Span",
+					"status": "done"
+				},
+				{
+					"id": "2.3",
+					"name": "otlp/http.go POST /v1/traces (protobuf + JSON)",
+					"status": "done"
+				},
+				{
+					"id": "2.4",
+					"name": "single-writer sink + grotto serve wiring",
+					"status": "done"
+				}
+			]
 		},
 		{
 			"phase": 3,
