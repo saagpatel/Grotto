@@ -46,6 +46,11 @@ FROM traces ORDER BY started_ns DESC LIMIT ?`
 // returned (wrapped). created_at is stamped at write time; it is store metadata,
 // not part of the span model.
 func (s *Store) InsertTrace(ctx context.Context, t model.Trace) (err error) {
+	// Scrub credential-shaped strings before anything touches disk. Both capture
+	// paths (marks + OTLP) funnel through here, so this is the one place redaction
+	// has to live.
+	t = Redact(t)
+
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)

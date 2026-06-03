@@ -3,7 +3,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 
@@ -11,10 +10,6 @@ import (
 
 	"github.com/saagpatel/grotto/internal/store"
 )
-
-// errNotImplemented is returned by subcommands whose behavior lands in a later
-// phase. Stubs wrap it with %w so callers can still match on it.
-var errNotImplemented = errors.New("not implemented yet")
 
 // NewRootCmd builds the root grotto command with all subcommands registered.
 // Registration is explicit (no package-level init side effects) so the command

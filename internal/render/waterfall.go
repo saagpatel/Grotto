@@ -73,3 +73,23 @@ func FormatDuration(ns int64) string {
 		return fmt.Sprintf("%dns", ns)
 	}
 }
+
+// HumanAge renders the elapsed time since a nanosecond wall-clock timestamp in
+// the largest coarse unit (s/m/h/d). Future timestamps (clock skew) read as
+// "0s ago". Shared by the TUI run list and `grotto list`.
+func HumanAge(createdNs int64, now time.Time) string {
+	d := now.Sub(time.Unix(0, createdNs))
+	if d < 0 {
+		d = 0
+	}
+	switch {
+	case d < time.Minute:
+		return fmt.Sprintf("%ds ago", int(d.Seconds()))
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	default:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	}
+}

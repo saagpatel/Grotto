@@ -131,17 +131,28 @@
 		],
 		"4": [
 			{
-				"test": "diff: per-span +/- ms deltas on two fixture runs",
-				"status": "planned"
-			},
-			{ "test": "list: last 50 runs newest-first", "status": "planned" },
-			{
-				"test": "store.redact: 4 secret patterns become redacted on ingest",
-				"status": "planned"
+				"test": "render.Diff: matched spans report signed delta; added/removed classified; empty traces -> nil",
+				"status": "passing"
 			},
 			{
-				"test": "build: darwin/arm64 + linux/amd64 static binaries <25MB",
-				"status": "planned"
+				"test": "render.WriteDiff: header + total delta + per-span signed deltas; signedDuration +/-/0",
+				"status": "passing"
+			},
+			{
+				"test": "render.WriteTraceList: newest-first table shape (id/spans/duration/src/age/label); empty placeholder",
+				"status": "passing"
+			},
+			{
+				"test": "store.redact: all 4 secret patterns masked; embedded secret + context; passthrough; InsertTrace round-trip redacted; input not mutated",
+				"status": "passing"
+			},
+			{
+				"test": "render.HumanAge: s/m/h/d buckets, future clamps to 0",
+				"status": "passing"
+			},
+			{
+				"test": "build: make build-all -> darwin/arm64 (Mach-O) + linux/amd64 (ELF static), ~17MB each (<25MB)",
+				"status": "passing"
 			}
 		]
 	}

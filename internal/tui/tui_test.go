@@ -215,17 +215,6 @@ func TestRoot_QuitKey(t *testing.T) {
 	assert.Equal(t, tea.Quit(), cmd(), "q must issue the quit command")
 }
 
-func TestHumanAge_Buckets(t *testing.T) {
-	now := time.Unix(1_000_000, 0)
-	ago := func(sec int64) int64 { return now.Add(-time.Duration(sec) * time.Second).UnixNano() }
-
-	assert.Equal(t, "30s ago", humanAge(ago(30), now))
-	assert.Equal(t, "5m ago", humanAge(ago(300), now))
-	assert.Equal(t, "2h ago", humanAge(ago(7200), now))
-	assert.Equal(t, "3d ago", humanAge(ago(259200), now))
-	assert.Equal(t, "0s ago", humanAge(now.Add(time.Hour).UnixNano(), now), "future timestamps clamp to 0")
-}
-
 // gen200SpanTrace builds a 200-span trace (one root + 199 children) for the
 // navigation performance acceptance check.
 func gen200SpanTrace() model.Trace {

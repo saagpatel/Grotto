@@ -1,7 +1,7 @@
 {
 	"project": "grotto",
 	"module": "github.com/saagpatel/grotto",
-	"current_phase": 3,
+	"current_phase": 4,
 	"phases": [
 		{
 			"phase": 0,
@@ -115,8 +115,34 @@
 		{
 			"phase": 4,
 			"name": "Compare, Polish, Distribution",
-			"status": "pending",
-			"tasks": []
+			"status": "done",
+			"tasks": [
+				{
+					"id": "4.1",
+					"name": "grotto diff: render.Diff (match by name/depth/sibling-index) + WriteDiff",
+					"status": "done"
+				},
+				{
+					"id": "4.2",
+					"name": "grotto list: store.RecentTraces + render.WriteTraceList table",
+					"status": "done"
+				},
+				{
+					"id": "4.3",
+					"name": "store/redact.go: 4 secret patterns redacted at the InsertTrace chokepoint",
+					"status": "done"
+				},
+				{
+					"id": "4.4",
+					"name": "Makefile cross-compile: darwin/arm64 + linux/amd64 static (~17MB)",
+					"status": "done"
+				},
+				{
+					"id": "4.5",
+					"name": "README.md: architecture + OTel data model / Go idioms writeup",
+					"status": "done"
+				}
+			]
 		}
 	]
 }

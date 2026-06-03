@@ -103,7 +103,7 @@ func (m runListModel) View() string {
 		line := fmt.Sprintf("  %-28s %6d  %10s  %-5s  %s",
 			truncate(r.RunLabel, 28), r.SpanCount,
 			render.FormatDuration(r.DurationNs), truncate(r.Source, 5),
-			humanAge(r.CreatedAt, now))
+			render.HumanAge(r.CreatedAt, now))
 		if i == m.cursor {
 			line = selectedStyle.Render(line)
 		}
@@ -125,23 +125,4 @@ func truncate(s string, n int) string {
 		return string(r[:n])
 	}
 	return string(r[:n-1]) + "…"
-}
-
-// humanAge renders the elapsed time since a nanosecond wall-clock timestamp in
-// the largest coarse unit. Future timestamps (clock skew) read as "0s ago".
-func humanAge(createdNs int64, now time.Time) string {
-	d := now.Sub(time.Unix(0, createdNs))
-	if d < 0 {
-		d = 0
-	}
-	switch {
-	case d < time.Minute:
-		return fmt.Sprintf("%ds ago", int(d.Seconds()))
-	case d < time.Hour:
-		return fmt.Sprintf("%dm ago", int(d.Minutes()))
-	case d < 24*time.Hour:
-		return fmt.Sprintf("%dh ago", int(d.Hours()))
-	default:
-		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
-	}
 }

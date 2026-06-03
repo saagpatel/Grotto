@@ -22,9 +22,9 @@ This project inherits the global CC setup: 34+ skills, agents, hooks, and MCP pl
 Project-specific overrides only — see IMPLEMENTATION-ROADMAP.md for architecture.
 
 ## Current Phase
-**Phases 0–3 complete. Next: Phase 4 — Compare, Polish, Distribution.**
-Phase 3 shipped the interactive Bubble Tea TUI (run list → waterfall → inspector).
-See IMPLEMENTATION-ROADMAP.md for full phase details.
+**v1 complete — Phases 0–4 all shipped.**
+All 7 subcommands live (run/mark/serve/show/list/diff/tui), OTLP receiver, interactive TUI,
+secret redaction on ingest, cross-compiled static binaries, README. See IMPLEMENTATION-ROADMAP.md.
 
 ## Key Decisions
 | Decision | Choice | Why |

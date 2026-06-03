@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -60,4 +61,15 @@ func TestFormatDuration(t *testing.T) {
 	for ns, want := range cases {
 		assert.Equalf(t, want, FormatDuration(ns), "FormatDuration(%d)", ns)
 	}
+}
+
+func TestHumanAge(t *testing.T) {
+	now := time.Unix(1_000_000, 0)
+	ago := func(sec int64) int64 { return now.Add(-time.Duration(sec) * time.Second).UnixNano() }
+
+	assert.Equal(t, "30s ago", HumanAge(ago(30), now))
+	assert.Equal(t, "5m ago", HumanAge(ago(300), now))
+	assert.Equal(t, "2h ago", HumanAge(ago(7200), now))
+	assert.Equal(t, "3d ago", HumanAge(ago(259200), now))
+	assert.Equal(t, "0s ago", HumanAge(now.Add(time.Hour).UnixNano(), now), "future timestamps clamp to 0")
 }
