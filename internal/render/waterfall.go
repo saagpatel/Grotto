@@ -74,6 +74,15 @@ func FormatDuration(ns int64) string {
 	}
 }
 
+// FormatTimestamp renders a nanosecond wall-clock timestamp as a human-readable
+// UTC date-time with millisecond precision and an explicit zone marker. UTC is
+// the canonical OTel time base, so the display is unambiguous and stable across
+// machines; the raw nanoseconds remain the canonical value in the store and JSON
+// export. This is the human-facing view used by the TUI inspector.
+func FormatTimestamp(ns int64) string {
+	return time.Unix(0, ns).UTC().Format("2006-01-02 15:04:05.000 UTC")
+}
+
 // HumanAge renders the elapsed time since a nanosecond wall-clock timestamp in
 // the largest coarse unit (s/m/h/d). Future timestamps (clock skew) read as
 // "0s ago". Shared by the TUI run list and `grotto list`.

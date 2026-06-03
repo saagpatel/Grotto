@@ -147,7 +147,7 @@ brew install otel-cli                        # optional, Phase 2 receiver testin
 
 **In scope (v1):** marks capture (`grotto mark`), OTLP receiver (gRPC + HTTP), shared OTel span model, SQLite history, static waterfall, interactive Bubble Tea TUI (3 screens), `diff`/`list`, secret redaction on ingest, single static binary.
 **Out of scope:** cloud export, multi-machine aggregation, auth on the receiver, encryption at rest, hosted UI, sampling/retention policies.
-**Deferred:** gRPC-only-fails → HTTP-only receiver (v1.1 gRPC); span-nesting for marks via `--child` (v1.1); linux/amd64 release if cross-compile snags (darwin/arm64 first).
+**Deferred → all shipped:** gRPC receiver shipped in Phase 2 (the HTTP-only fallback was never needed); span-nesting for marks via `--child` shipped in v1.1 (depth-2: a `--child` mark subdivides the most recent non-child section); linux/amd64 shipped in the Phase 4 Makefile alongside darwin/arm64.
 
 ## Security and Credentials
 

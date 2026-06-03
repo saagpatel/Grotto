@@ -59,8 +59,8 @@ func (m inspectorModel) View() string {
 		field("kind", kindLabel(sp.Kind)),
 		field("status", status),
 		field("duration", render.FormatDuration(sp.DurationNs)),
-		field("started", fmt.Sprintf("%d ns", sp.StartedNs)),
-		field("ended", fmt.Sprintf("%d ns", sp.EndedNs)),
+		field("started", render.FormatTimestamp(sp.StartedNs)),
+		field("ended", render.FormatTimestamp(sp.EndedNs)),
 		"",
 		labelStyle.Render("  attributes"))
 

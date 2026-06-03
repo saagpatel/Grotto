@@ -54,6 +54,62 @@ func TestAssembleTrace_MarksBecomeChildSpans(t *testing.T) {
 	}
 }
 
+func TestAssembleTrace_ChildMarksNest(t *testing.T) {
+	// setup, compile, test are sections under root; gcc and ld are --child marks
+	// that subdivide the compile section.
+	marks := []Mark{
+		{Name: "setup", TSNs: 100},
+		{Name: "compile", TSNs: 200},
+		{Name: "gcc", TSNs: 250, Child: true},
+		{Name: "ld", TSNs: 300, Child: true},
+		{Name: "test", TSNs: 400},
+	}
+	tr := assembleTrace([]string{"build.sh"}, marks, 50, 500, model.StatusOk)
+	require.Equal(t, 6, tr.SpanCount, "1 root + 5 marks")
+
+	byName := make(map[string]model.Span, len(tr.Spans))
+	for _, s := range tr.Spans {
+		byName[s.Name] = s
+	}
+	root := byName["build.sh"]
+	require.Empty(t, root.ParentSpanID)
+
+	// Sections parent to root and span until the next section (next non-child mark).
+	for _, tc := range []struct {
+		name       string
+		start, end int64
+	}{
+		{"setup", 100, 200},   // -> compile
+		{"compile", 200, 400}, // -> test (skips the intervening children)
+		{"test", 400, 500},    // -> command end
+	} {
+		s := byName[tc.name]
+		assert.Equal(t, root.SpanID, s.ParentSpanID, "%s parents to root", tc.name)
+		assert.Equal(t, tc.start, s.StartedNs, "%s start", tc.name)
+		assert.Equal(t, tc.end, s.EndedNs, "%s end", tc.name)
+	}
+
+	// Children parent to the compile section and end at the very next mark, so
+	// gcc+ld exactly subdivide compile's [200,400] interval from 250 onward.
+	compile := byName["compile"]
+	gcc, ld := byName["gcc"], byName["ld"]
+	assert.Equal(t, compile.SpanID, gcc.ParentSpanID, "gcc nests under compile")
+	assert.Equal(t, compile.SpanID, ld.ParentSpanID, "ld nests under compile")
+	assert.Equal(t, int64(250), gcc.StartedNs)
+	assert.Equal(t, int64(300), gcc.EndedNs) // -> ld
+	assert.Equal(t, int64(300), ld.StartedNs)
+	assert.Equal(t, int64(400), ld.EndedNs) // -> test (the next section)
+}
+
+func TestAssembleTrace_LeadingChildDegradesToRoot(t *testing.T) {
+	// A --child mark with no open section parents to the root rather than dangling.
+	marks := []Mark{{Name: "orphan", TSNs: 100, Child: true}}
+	tr := assembleTrace([]string{"build.sh"}, marks, 50, 500, model.StatusOk)
+	require.Len(t, tr.Spans, 2)
+	root, orphan := tr.Spans[0], tr.Spans[1]
+	assert.Equal(t, root.SpanID, orphan.ParentSpanID, "leading --child falls back to root")
+}
+
 func TestEmit_OverSocket(t *testing.T) {
 	dir := t.TempDir()
 	sock := filepath.Join(dir, "sock")
@@ -66,8 +122,8 @@ func TestEmit_OverSocket(t *testing.T) {
 
 	t.Setenv(EnvSock, sock)
 	t.Setenv(EnvSpool, "")
-	require.NoError(t, Emit("compile"))
-	require.NoError(t, Emit("test"))
+	require.NoError(t, Emit("compile", false))
+	require.NoError(t, Emit("test", false))
 
 	require.NoError(t, ln.Close())
 	c.wg.Wait()
@@ -84,8 +140,8 @@ func TestEmit_SpoolFallback(t *testing.T) {
 	t.Setenv(EnvSock, filepath.Join(dir, "missing.sock")) // dial fails -> spool
 	t.Setenv(EnvSpool, spool)
 
-	require.NoError(t, Emit("a"))
-	require.NoError(t, Emit("b"))
+	require.NoError(t, Emit("a", false))
+	require.NoError(t, Emit("b", false))
 
 	marks, err := readSpool(spool)
 	require.NoError(t, err)
@@ -97,7 +153,7 @@ func TestEmit_SpoolFallback(t *testing.T) {
 func TestEmit_OutsideRun(t *testing.T) {
 	t.Setenv(EnvSock, "")
 	t.Setenv(EnvSpool, "")
-	assert.Error(t, Emit("x"))
+	assert.Error(t, Emit("x", false))
 }
 
 func TestEmit_ConcurrentOverSocket(t *testing.T) {
@@ -119,7 +175,7 @@ func TestEmit_ConcurrentOverSocket(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			assert.NoError(t, Emit(fmt.Sprintf("mark-%d", i)))
+			assert.NoError(t, Emit(fmt.Sprintf("mark-%d", i), false))
 		}(i)
 	}
 	wg.Wait()
