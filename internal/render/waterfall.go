@@ -40,7 +40,7 @@ func WriteWaterfall(w io.Writer, tr model.Trace) error {
 		if b.Status == model.StatusError {
 			marker = " !"
 		}
-		fmt.Fprintf(&sb, "%s%s  %s  %s%s\n", label, pad, timeline, formatDuration(b.DurationNs), marker)
+		fmt.Fprintf(&sb, "%s%s  %s  %s%s\n", label, pad, timeline, FormatDuration(b.DurationNs), marker)
 	}
 
 	_, err := io.WriteString(w, sb.String())
@@ -57,8 +57,10 @@ func WriteJSON(w io.Writer, tr model.Trace) error {
 	return nil
 }
 
-// formatDuration renders a nanosecond duration in the largest readable unit.
-func formatDuration(ns int64) string {
+// FormatDuration renders a nanosecond duration in the largest readable unit.
+// Exported so the TUI run list and `grotto list` render durations identically to
+// the static waterfall.
+func FormatDuration(ns int64) string {
 	d := time.Duration(ns)
 	switch {
 	case d >= time.Second:

@@ -58,6 +58,6 @@ func TestFormatDuration(t *testing.T) {
 		42:          "42ns",
 	}
 	for ns, want := range cases {
-		assert.Equalf(t, want, formatDuration(ns), "formatDuration(%d)", ns)
+		assert.Equalf(t, want, FormatDuration(ns), "FormatDuration(%d)", ns)
 	}
 }

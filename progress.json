@@ -1,7 +1,7 @@
 {
 	"project": "grotto",
 	"module": "github.com/saagpatel/grotto",
-	"current_phase": 2,
+	"current_phase": 3,
 	"phases": [
 		{
 			"phase": 0,
@@ -88,8 +88,29 @@
 		{
 			"phase": 3,
 			"name": "Interactive Bubble Tea TUI",
-			"status": "pending",
-			"tasks": []
+			"status": "done",
+			"tasks": [
+				{
+					"id": "3.1",
+					"name": "tui/app.go root model: screen enum, key routing, async load cmds",
+					"status": "done"
+				},
+				{
+					"id": "3.2",
+					"name": "tui/runlist.go run list + store.RecentTraces query",
+					"status": "done"
+				},
+				{
+					"id": "3.3",
+					"name": "tui/waterfall.go collapsible viewport waterfall (reuses render.Layout)",
+					"status": "done"
+				},
+				{
+					"id": "3.4",
+					"name": "tui/inspector.go span detail + grotto tui wiring",
+					"status": "done"
+				}
+			]
 		},
 		{
 			"phase": 4,

@@ -37,6 +37,10 @@ JOIN spans s ON s.span_id = a.span_id
 WHERE s.trace_id = ?
 ORDER BY a.span_id, a.key`
 
+const selectRecentTracesSQL = `
+SELECT trace_id, run_label, source, root_name, started_ns, duration_ns, span_count, created_at
+FROM traces ORDER BY started_ns DESC LIMIT ?`
+
 // InsertTrace persists a trace with all of its spans and attributes in a single
 // transaction. On any failure the transaction is rolled back and the error is
 // returned (wrapped). created_at is stamped at write time; it is store metadata,
@@ -173,4 +177,46 @@ func (s *Store) loadAttrs(ctx context.Context, traceID string) (map[string][]mod
 		return nil, fmt.Errorf("iterate attrs for %q: %w", traceID, err)
 	}
 	return bySpan, nil
+}
+
+// TraceSummary is run-level metadata for a stored trace, without its spans —
+// enough to populate a run list without the cost of loading every span. CreatedAt
+// is the store write time (nanoseconds), used for age display in the UI.
+type TraceSummary struct {
+	TraceID    string
+	RunLabel   string
+	Source     string
+	RootName   string
+	StartedNs  int64
+	DurationNs int64
+	SpanCount  int
+	CreatedAt  int64
+}
+
+// RecentTraces returns up to limit trace summaries, newest first by start time
+// (the started_ns DESC index backs the ordering). A non-positive limit yields no
+// rows. Used by the TUI run list and, later, `grotto list`.
+func (s *Store) RecentTraces(ctx context.Context, limit int) ([]TraceSummary, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+	rows, err := s.db.QueryContext(ctx, selectRecentTracesSQL, limit)
+	if err != nil {
+		return nil, fmt.Errorf("query recent traces: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []TraceSummary
+	for rows.Next() {
+		var ts TraceSummary
+		if err := rows.Scan(&ts.TraceID, &ts.RunLabel, &ts.Source, &ts.RootName,
+			&ts.StartedNs, &ts.DurationNs, &ts.SpanCount, &ts.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan trace summary: %w", err)
+		}
+		out = append(out, ts)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate recent traces: %w", err)
+	}
+	return out, nil
 }

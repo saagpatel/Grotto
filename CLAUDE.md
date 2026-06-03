@@ -22,7 +22,8 @@ This project inherits the global CC setup: 34+ skills, agents, hooks, and MCP pl
 Project-specific overrides only — see IMPLEMENTATION-ROADMAP.md for architecture.
 
 ## Current Phase
-**Phase 0: Toolchain + Scaffold + Span Model + Store**
+**Phases 0–3 complete. Next: Phase 4 — Compare, Polish, Distribution.**
+Phase 3 shipped the interactive Bubble Tea TUI (run list → waterfall → inspector).
 See IMPLEMENTATION-ROADMAP.md for full phase details.
 
 ## Key Decisions

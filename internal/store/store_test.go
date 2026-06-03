@@ -79,3 +79,66 @@ func TestStore_ForeignKeyEnforced(t *testing.T) {
 		 VALUES ('x', 'missing-trace', NULL, 'n', 0, 0, 0, 0, 0)`)
 	require.Error(t, err, "foreign key constraint must reject an orphan span")
 }
+
+// minimalTrace builds a one-span (root only) trace for ordering/listing tests.
+func minimalTrace(id, label string, startedNs int64) model.Trace {
+	return model.Trace{
+		TraceID: id, RunLabel: label, Source: "mark", RootName: "root",
+		StartedNs: startedNs, EndedNs: startedNs + 100, DurationNs: 100, SpanCount: 1,
+		Spans: []model.Span{{
+			SpanID: id + "-root", TraceID: id, Name: "root",
+			Kind: model.KindInternal, Status: model.StatusOk,
+			StartedNs: startedNs, EndedNs: startedNs + 100, DurationNs: 100,
+		}},
+	}
+}
+
+func TestStore_RecentTracesNewestFirst(t *testing.T) {
+	st, ctx := newTestStore(t)
+
+	// Insert out of start-time order; RecentTraces must return newest start first.
+	require.NoError(t, st.InsertTrace(ctx, minimalTrace("t-mid", "middle", 200)))
+	require.NoError(t, st.InsertTrace(ctx, minimalTrace("t-old", "oldest", 100)))
+	require.NoError(t, st.InsertTrace(ctx, minimalTrace("t-new", "newest", 300)))
+
+	got, err := st.RecentTraces(ctx, 50)
+	require.NoError(t, err)
+	require.Len(t, got, 3)
+
+	assert.Equal(t, []string{"t-new", "t-mid", "t-old"},
+		[]string{got[0].TraceID, got[1].TraceID, got[2].TraceID},
+		"summaries must be ordered newest start time first")
+
+	// Summary fields are populated from the traces row.
+	assert.Equal(t, "newest", got[0].RunLabel)
+	assert.Equal(t, "mark", got[0].Source)
+	assert.Equal(t, 1, got[0].SpanCount)
+	assert.Equal(t, int64(300), got[0].StartedNs)
+	assert.Equal(t, int64(100), got[0].DurationNs)
+	assert.Positive(t, got[0].CreatedAt, "created_at is stamped at write time")
+}
+
+func TestStore_RecentTracesLimit(t *testing.T) {
+	st, ctx := newTestStore(t)
+	for i := int64(0); i < 5; i++ {
+		require.NoError(t, st.InsertTrace(ctx, minimalTrace(
+			"t"+string(rune('a'+i)), "run", i*10)))
+	}
+
+	got, err := st.RecentTraces(ctx, 2)
+	require.NoError(t, err)
+	assert.Len(t, got, 2, "limit must cap the number of summaries")
+}
+
+func TestStore_RecentTracesEmptyAndNonPositiveLimit(t *testing.T) {
+	st, ctx := newTestStore(t)
+
+	empty, err := st.RecentTraces(ctx, 50)
+	require.NoError(t, err)
+	assert.Empty(t, empty, "no traces stored yields no summaries")
+
+	require.NoError(t, st.InsertTrace(ctx, minimalTrace("t1", "run", 0)))
+	none, err := st.RecentTraces(ctx, 0)
+	require.NoError(t, err)
+	assert.Empty(t, none, "a non-positive limit yields no summaries")
+}

@@ -101,20 +101,32 @@
 		],
 		"3": [
 			{
-				"test": "tui.app: launches, q quits cleanly, screen transitions work",
-				"status": "planned"
+				"test": "tui.app: run-list -> waterfall transition via enter/select/load; esc pops screens; q quits",
+				"status": "passing"
 			},
 			{
-				"test": "tui.runlist: shows label/span-count/duration; enter opens waterfall",
-				"status": "planned"
+				"test": "tui.runlist: cursor nav clamps; enter emits selectTraceMsg for cursor row; empty list is no-op",
+				"status": "passing"
 			},
 			{
-				"test": "tui.waterfall: 200-span navigation <50ms/keystroke; collapse hides subtree",
-				"status": "planned"
+				"test": "tui.waterfall: collapse root hides all, collapse subtree hides children; enter opens inspector for cursor span",
+				"status": "passing"
 			},
 			{
-				"test": "tui.inspector: enter shows typed attributes; esc returns",
-				"status": "planned"
+				"test": "tui.waterfall: 200-span navigation well under 50ms/keystroke (measured ~50us)",
+				"status": "passing"
+			},
+			{
+				"test": "tui.inspector: renders identity, kind/status labels, typed attributes, duration",
+				"status": "passing"
+			},
+			{
+				"test": "store.RecentTraces: newest-first ordering, limit cap, empty + non-positive limit",
+				"status": "passing"
+			},
+			{
+				"test": "tui helpers: humanAge buckets (s/m/h/d, future clamps to 0), rune-aware truncate",
+				"status": "passing"
 			}
 		],
 		"4": [
