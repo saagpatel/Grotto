@@ -4,16 +4,36 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"github.com/saagpatel/grotto/internal/render"
 )
 
-// newShowCmd builds `grotto show` — print a static waterfall for a stored trace.
-// Behavior arrives in Phase 1.
+// newShowCmd builds `grotto show <trace-id>` — print a stored trace as a static
+// waterfall, or as JSON with --json.
 func newShowCmd() *cobra.Command {
-	return &cobra.Command{
+	var asJSON bool
+	cmd := &cobra.Command{
 		Use:   "show <trace-id>",
 		Short: "Print a static waterfall for a stored trace",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return fmt.Errorf("show: %w (arrives in Phase 1)", errNotImplemented)
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			st, err := openStore(ctx)
+			if err != nil {
+				return err
+			}
+			defer func() { _ = st.Close() }()
+
+			tr, err := st.GetTrace(ctx, args[0])
+			if err != nil {
+				return fmt.Errorf("show: %w", err)
+			}
+			if asJSON {
+				return render.WriteJSON(cmd.OutOrStdout(), tr)
+			}
+			return render.WriteWaterfall(cmd.OutOrStdout(), tr)
 		},
 	}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "output the trace as JSON instead of a waterfall")
+	return cmd
 }

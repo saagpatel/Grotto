@@ -45,20 +45,28 @@
 		],
 		"1": [
 			{
-				"test": "collect: grotto run over UDS assembles a trace from marks",
-				"status": "planned"
+				"test": "collect: grotto run over UDS assembles a trace from marks (build binary, end-to-end)",
+				"status": "passing"
 			},
 			{
-				"test": "collect: build-script.sh (5 marks) -> 5 child spans under 1 root",
-				"status": "planned"
+				"test": "collect: 5 marks -> 5 child spans under 1 root",
+				"status": "passing"
+			},
+			{
+				"test": "collect: mark emit over socket, spool fallback, concurrent emit, dedup",
+				"status": "passing"
 			},
 			{
 				"test": "render.layout: per-span bar offsets within +/-1 char on 6-span fixture",
-				"status": "planned"
+				"status": "passing"
 			},
 			{
-				"test": "render.waterfall: grotto show output matches expected-waterfall.txt",
-				"status": "planned"
+				"test": "render.waterfall: show output matches expected-waterfall.txt (golden)",
+				"status": "passing"
+			},
+			{
+				"test": "render: WriteJSON shape (span_count, parent ids), formatDuration units",
+				"status": "passing"
 			}
 		],
 		"2": [

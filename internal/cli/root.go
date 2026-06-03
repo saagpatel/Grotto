@@ -2,11 +2,14 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"github.com/saagpatel/grotto/internal/store"
 )
 
 // errNotImplemented is returned by subcommands whose behavior lands in a later
@@ -36,6 +39,20 @@ func NewRootCmd() *cobra.Command {
 		newTUICmd(),
 	)
 	return root
+}
+
+// openStore opens the local trace database at its default location (honoring
+// GROTTO_DB). Callers own closing the returned store.
+func openStore(ctx context.Context) (*store.Store, error) {
+	path, err := store.DefaultDBPath()
+	if err != nil {
+		return nil, err
+	}
+	st, err := store.Open(ctx, path)
+	if err != nil {
+		return nil, fmt.Errorf("open store: %w", err)
+	}
+	return st, nil
 }
 
 // Execute runs the root command, printing any error to stderr, and returns the
