@@ -43,3 +43,41 @@ At the end of every phase, run `/ultrareview` before committing the phase-final 
 - Do not introduce a cgo dependency — `CGO_ENABLED=0 go build` is a hard gate; `go mod why` any offender and replace with pure Go.
 - Do not invent a homegrown span/timestamp shape — model everything as genuine OpenTelemetry spans.
 - Do not start the OTLP receiver (Phase 2) before the marks→store→waterfall slice (Phases 0–1) works end-to-end.
+
+<!-- portfolio-context:start -->
+# Portfolio Context
+
+## What This Project Is
+
+Local-first Go CLI + TUI that renders OpenTelemetry trace waterfalls for shell commands, build scripts, and test suites — see exactly where time goes in a slow run. Zero cloud backend; everything persists to local SQLite. Built by the operator as a deliberate Go + observability gap-fill for a Platform Engineer — DX & AI Infrastructure target.
+
+## Current State
+
+**v1 complete — Phases 0–4 all shipped.**
+All 7 subcommands live (run/mark/serve/show/list/diff/tui), OTLP receiver, interactive TUI,
+secret redaction on ingest, cross-compiled static binaries, README. See IMPLEMENTATION-ROADMAP.md.
+
+## Stack
+
+- Go: 1.22+ (first Go project — idiom guardrails below are load-bearing)
+- CLI: Cobra 1.8+
+- TUI: Bubble Tea 0.27+ / lipgloss / bubbles
+- Tracing: OpenTelemetry Go SDK 1.30+ + OTLP proto 1.3+ + gRPC 1.66+
+- Storage: modernc.org/sqlite 1.33+ (pure Go, NO cgo)
+
+## How To Run
+
+- Review the README and top-level scripts before the next session; this repo does not yet expose one canonical run command inside the new context block.
+
+## Known Risks
+
+- Do not add features not in the current phase of IMPLEMENTATION-ROADMAP.md.
+- Do not introduce a cgo dependency — `CGO_ENABLED=0 go build` is a hard gate; `go mod why` any offender and replace with pure Go.
+- Do not invent a homegrown span/timestamp shape — model everything as genuine OpenTelemetry spans.
+- Do not start the OTLP receiver (Phase 2) before the marks→store→waterfall slice (Phases 0–1) works end-to-end.
+
+## Next Recommended Move
+
+Use this context plus the README and supporting docs to resume the next active task, then promote the repo beyond minimum-viable by capturing a dedicated handoff, roadmap, or discovery artifact.
+
+<!-- portfolio-context:end -->
