@@ -1,0 +1,9 @@
+# Build output
+/grotto
+/dist/
+
+# Local runtime state
+/.grotto/
+*.db
+*.db-shm
+*.db-wal

@@ -1,0 +1,25 @@
+version: "2"
+
+run:
+  timeout: 3m
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+  settings:
+    errcheck:
+      # Catch unchecked error returns. Explicit `_ =` assignments remain the
+      # accepted way to acknowledge a deliberately-ignored error (e.g. deferred
+      # Close on a read-only *sql.Rows, or Close on an error path).
+      check-type-assertions: true
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/saagpatel/grotto

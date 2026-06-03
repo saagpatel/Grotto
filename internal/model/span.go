@@ -1,0 +1,138 @@
+// Package model defines the OpenTelemetry-shaped span types that flow through
+// Grotto's capture, storage, and rendering layers. Both capture paths (grotto
+// marks and the OTLP receiver) converge on these types so there is exactly one
+// span model in the system — deliberately genuine OTel shapes, not a homegrown
+// timestamp format.
+package model
+
+import "sort"
+
+// SpanKind mirrors the OpenTelemetry SpanKind enumeration (0..5).
+type SpanKind int32
+
+// OpenTelemetry span kinds.
+const (
+	KindUnspecified SpanKind = 0
+	KindInternal    SpanKind = 1
+	KindServer      SpanKind = 2
+	KindClient      SpanKind = 3
+	KindProducer    SpanKind = 4
+	KindConsumer    SpanKind = 5
+)
+
+// StatusCode mirrors the OpenTelemetry status code enumeration.
+type StatusCode int32
+
+// OpenTelemetry status codes.
+const (
+	StatusUnset StatusCode = 0
+	StatusOk    StatusCode = 1
+	StatusError StatusCode = 2
+)
+
+// Attribute is a single typed key/value pair on a span. Value is stored as a
+// string; type-assert against ValueType ("str"|"int"|"float"|"bool") to recover
+// the original type.
+type Attribute struct {
+	Key       string
+	ValueType string
+	Value     string
+}
+
+// Span is a single OpenTelemetry span. ParentSpanID is empty for a root span.
+type Span struct {
+	SpanID       string
+	TraceID      string
+	ParentSpanID string
+	Name         string
+	Kind         SpanKind
+	Status       StatusCode
+	StartedNs    int64
+	EndedNs      int64
+	DurationNs   int64
+	Attributes   []Attribute
+}
+
+// Trace is the set of spans sharing one trace ID, plus run-level metadata.
+type Trace struct {
+	TraceID    string
+	RunLabel   string
+	Source     string // "mark" | "otlp"
+	RootName   string
+	StartedNs  int64
+	EndedNs    int64
+	DurationNs int64
+	SpanCount  int
+	Spans      []Span
+}
+
+// TreeNode is a span positioned in the parent/child hierarchy, annotated with
+// its depth from the root (the root has depth 0).
+type TreeNode struct {
+	Span     Span
+	Depth    int
+	Children []*TreeNode
+}
+
+// AssembleTree organizes spans into a parent/child tree rooted at the span with
+// no parent, annotating each node with its depth. Sibling children are ordered
+// by start time so rendering is deterministic. Returns nil when spans is empty
+// or contains no root span.
+//
+// The function is defensive against malformed input, since both capture paths
+// (marks and the OTLP receiver) can deliver untrusted span sets:
+//   - Duplicate span IDs: the first occurrence wins; later ones are ignored.
+//   - Multiple parentless spans: the first (in input order) is the root; v1
+//     models a single-rooted trace, so additional roots are not attached.
+//   - Orphans (parent absent from the input) and self-parented spans are
+//     dropped rather than attached, so no cycle can be reached from the root.
+func AssembleTree(spans []Span) *TreeNode {
+	if len(spans) == 0 {
+		return nil
+	}
+
+	// Build nodes in first-occurrence order, ignoring duplicate span IDs.
+	nodes := make(map[string]*TreeNode, len(spans))
+	order := make([]*TreeNode, 0, len(spans))
+	for i := range spans {
+		if _, exists := nodes[spans[i].SpanID]; exists {
+			continue
+		}
+		node := &TreeNode{Span: spans[i]}
+		nodes[spans[i].SpanID] = node
+		order = append(order, node)
+	}
+
+	var root *TreeNode
+	for _, node := range order {
+		if node.Span.ParentSpanID == "" {
+			if root == nil {
+				root = node
+			}
+			continue
+		}
+		// Attach to the parent only when it exists and is not the node itself
+		// (a self-parent would create a cycle).
+		if parent, ok := nodes[node.Span.ParentSpanID]; ok && parent != node {
+			parent.Children = append(parent.Children, node)
+		}
+	}
+
+	if root == nil {
+		return nil
+	}
+	assignDepth(root, 0)
+	return root
+}
+
+// assignDepth sets depth on n and its descendants, ordering each node's children
+// by start time before recursing.
+func assignDepth(n *TreeNode, depth int) {
+	n.Depth = depth
+	sort.Slice(n.Children, func(i, j int) bool {
+		return n.Children[i].Span.StartedNs < n.Children[j].Span.StartedNs
+	})
+	for _, child := range n.Children {
+		assignDepth(child, depth+1)
+	}
+}

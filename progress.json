@@ -1,0 +1,23 @@
+{
+  "project": "grotto",
+  "module": "github.com/saagpatel/grotto",
+  "current_phase": 0,
+  "phases": [
+    {
+      "phase": 0,
+      "name": "Toolchain + Scaffold + Span Model + Store",
+      "status": "done",
+      "tasks": [
+        { "id": "0.1", "name": "Toolchain verified + go mod init + .golangci.yml", "status": "done" },
+        { "id": "0.2", "name": "Cobra root + 7 stub subcommands", "status": "done" },
+        { "id": "0.3", "name": "internal/model/span.go structs + AssembleTree", "status": "done" },
+        { "id": "0.4", "name": "internal/store SQLite (go:embed migration, insert/get)", "status": "done" },
+        { "id": "0.5", "name": "progress.json + tests.json", "status": "done" }
+      ]
+    },
+    { "phase": 1, "name": "Marks Capture -> Store -> Static Waterfall", "status": "pending", "tasks": [] },
+    { "phase": 2, "name": "OTLP Receiver (gRPC + HTTP)", "status": "pending", "tasks": [] },
+    { "phase": 3, "name": "Interactive Bubble Tea TUI", "status": "pending", "tasks": [] },
+    { "phase": 4, "name": "Compare, Polish, Distribution", "status": "pending", "tasks": [] }
+  ]
+}

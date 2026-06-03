@@ -1,0 +1,116 @@
+{
+	"project": "grotto",
+	"phases": {
+		"0": [
+			{
+				"test": "model.AssembleTree: 6-span fixture -> correct nesting and per-node depth",
+				"status": "passing"
+			},
+			{
+				"test": "model.AssembleTree: empty/nil input -> nil",
+				"status": "passing"
+			},
+			{
+				"test": "model.AssembleTree: span with missing parent is skipped",
+				"status": "passing"
+			},
+			{
+				"test": "model.AssembleTree: input with no root -> nil",
+				"status": "passing"
+			},
+			{
+				"test": "model.AssembleTree: duplicate span ID -> first occurrence wins",
+				"status": "passing"
+			},
+			{
+				"test": "model.AssembleTree: multiple roots -> first parentless span is root",
+				"status": "passing"
+			},
+			{
+				"test": "model.AssembleTree: self-parented span does not recurse",
+				"status": "passing"
+			},
+			{
+				"test": "store: 6-span trace round-trips identically (spans + attributes, ordered)",
+				"status": "passing"
+			},
+			{
+				"test": "store: GetTrace on missing id -> sql.ErrNoRows",
+				"status": "passing"
+			},
+			{
+				"test": "store: foreign key constraint rejects orphan span (pragma active)",
+				"status": "passing"
+			}
+		],
+		"1": [
+			{
+				"test": "collect: grotto run over UDS assembles a trace from marks",
+				"status": "planned"
+			},
+			{
+				"test": "collect: build-script.sh (5 marks) -> 5 child spans under 1 root",
+				"status": "planned"
+			},
+			{
+				"test": "render.layout: per-span bar offsets within +/-1 char on 6-span fixture",
+				"status": "planned"
+			},
+			{
+				"test": "render.waterfall: grotto show output matches expected-waterfall.txt",
+				"status": "planned"
+			}
+		],
+		"2": [
+			{
+				"test": "otlp.mapproto: three-span-trace.json -> 3 spans, attrs + parents preserved",
+				"status": "planned"
+			},
+			{
+				"test": "otlp.grpc: otel-cli export lands a trace with source=otlp",
+				"status": "planned"
+			},
+			{
+				"test": "otlp.http: POST /v1/traces protobuf body stores a trace",
+				"status": "planned"
+			},
+			{
+				"test": "store: 200-span export, zero database-locked errors across 10 runs",
+				"status": "planned"
+			}
+		],
+		"3": [
+			{
+				"test": "tui.app: launches, q quits cleanly, screen transitions work",
+				"status": "planned"
+			},
+			{
+				"test": "tui.runlist: shows label/span-count/duration; enter opens waterfall",
+				"status": "planned"
+			},
+			{
+				"test": "tui.waterfall: 200-span navigation <50ms/keystroke; collapse hides subtree",
+				"status": "planned"
+			},
+			{
+				"test": "tui.inspector: enter shows typed attributes; esc returns",
+				"status": "planned"
+			}
+		],
+		"4": [
+			{
+				"test": "diff: per-span +/- ms deltas on two fixture runs",
+				"status": "planned"
+			},
+			{ "test": "list: last 50 runs newest-first", "status": "planned" },
+			{
+				"test": "store.redact: 4 secret patterns become redacted on ingest",
+				"status": "planned"
+			},
+			{
+				"test": "build: darwin/arm64 + linux/amd64 static binaries <25MB",
+				"status": "planned"
+			}
+		]
+	}
+}
