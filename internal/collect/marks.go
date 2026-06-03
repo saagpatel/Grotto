@@ -7,6 +7,11 @@
 // A mark is a demarcation point: each mark opens a child span that runs until
 // the next mark, or until the command exits for the final mark. N marks therefore
 // produce N child spans under a single root span (N+1 spans total).
+//
+// A mark may carry --child, nesting it one level under the most recent non-child
+// mark (its "section") rather than parenting to the root. A child span runs until
+// the very next mark — a sibling child or the next section — exactly subdividing
+// its parent section's interval. Nesting is one level deep by design.
 package collect
 
 import (
@@ -40,10 +45,14 @@ const (
 // writing its acknowledgement, so a stalled connection cannot hang a handler.
 const connTimeout = 2 * time.Second
 
-// Mark is one demarcation point emitted by `grotto mark <name>`.
+// Mark is one demarcation point emitted by `grotto mark <name>`. Child marks
+// (`grotto mark <name> --child`) nest one level under the most recent non-child
+// mark instead of parenting to the root. Mark stays comparable so it can key the
+// dedup set directly.
 type Mark struct {
-	Name string `json:"name"`
-	TSNs int64  `json:"ts_ns"`
+	Name  string `json:"name"`
+	TSNs  int64  `json:"ts_ns"`
+	Child bool   `json:"child,omitempty"`
 }
 
 // Run executes argv[0] with argv[1:], collecting marks over a Unix domain socket
@@ -238,19 +247,47 @@ func assembleTrace(argv []string, marks []Mark, startNs, endNs int64, status mod
 	spans := make([]model.Span, 0, len(marks)+1)
 	spans = append(spans, newSpan(rootID, "", rootName, status, startNs, endNs))
 
+	// sectionID is the parent for the next --child mark: the most recent non-child
+	// mark's span, or the root when no section is open yet (so a leading --child
+	// degrades gracefully to a root child rather than dangling).
+	sectionID := rootID
 	for i, m := range marks {
 		spanStart := m.TSNs
 		if spanStart < startNs {
 			spanStart = startNs
 		}
-		spanEnd := endNs
-		if i+1 < len(marks) {
-			spanEnd = marks[i+1].TSNs
+
+		var parentID string
+		var spanEnd int64
+		if m.Child {
+			// A child ends at the very next mark — a sibling child or the next
+			// section — so its interval subdivides the current section.
+			parentID = sectionID
+			spanEnd = endNs
+			if i+1 < len(marks) {
+				spanEnd = marks[i+1].TSNs
+			}
+		} else {
+			// A section parents to the root and runs until the next non-child
+			// mark (the next section), or the command's end.
+			parentID = rootID
+			spanEnd = endNs
+			for j := i + 1; j < len(marks); j++ {
+				if !marks[j].Child {
+					spanEnd = marks[j].TSNs
+					break
+				}
+			}
 		}
 		if spanEnd < spanStart {
 			spanEnd = spanStart
 		}
-		spans = append(spans, newSpan(newSpanID(), rootID, m.Name, model.StatusOk, spanStart, spanEnd))
+
+		id := newSpanID()
+		spans = append(spans, newSpan(id, parentID, m.Name, model.StatusOk, spanStart, spanEnd))
+		if !m.Child {
+			sectionID = id // subsequent --child marks nest under this section
+		}
 	}
 
 	return model.Trace{

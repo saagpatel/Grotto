@@ -15,17 +15,18 @@ import (
 const emitTimeout = time.Second
 
 // Emit records a mark named name, timestamped at call time, for the active run.
-// It prefers the Unix domain socket at GROTTO_SOCK and falls back to appending a
-// JSONL line to GROTTO_SPOOL if the socket is unreachable or does not acknowledge
-// the mark. It returns an error when invoked outside a `grotto run`.
-func Emit(name string) error {
+// When child is true the mark nests one level under the most recent non-child
+// mark. It prefers the Unix domain socket at GROTTO_SOCK and falls back to
+// appending a JSONL line to GROTTO_SPOOL if the socket is unreachable or does not
+// acknowledge the mark. It returns an error when invoked outside a `grotto run`.
+func Emit(name string, child bool) error {
 	sock := os.Getenv(EnvSock)
 	spool := os.Getenv(EnvSpool)
 	if sock == "" && spool == "" {
 		return errors.New("not inside a grotto run (GROTTO_SOCK unset)")
 	}
 
-	m := Mark{Name: name, TSNs: time.Now().UnixNano()}
+	m := Mark{Name: name, TSNs: time.Now().UnixNano(), Child: child}
 	if sock != "" {
 		if err := emitSocket(sock, m); err == nil {
 			return nil // acknowledged by the run
