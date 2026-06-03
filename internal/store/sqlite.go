@@ -6,11 +6,26 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	_ "modernc.org/sqlite" // registers the "sqlite" driver
 
 	"github.com/saagpatel/grotto/migrations"
 )
+
+// DefaultDBPath returns the path to the local trace database, honoring the
+// GROTTO_DB override and otherwise defaulting to ~/.grotto/grotto.db.
+func DefaultDBPath() (string, error) {
+	if p := os.Getenv("GROTTO_DB"); p != "" {
+		return p, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve home dir: %w", err)
+	}
+	return filepath.Join(home, ".grotto", "grotto.db"), nil
+}
 
 // Store is a handle to Grotto's SQLite-backed trace history.
 type Store struct {
@@ -21,6 +36,11 @@ type Store struct {
 // embedded schema. Foreign keys and a busy timeout are enabled per connection so
 // cascading deletes work and concurrent writers back off rather than erroring.
 func Open(ctx context.Context, path string) (*Store, error) {
+	if dir := filepath.Dir(path); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return nil, fmt.Errorf("create db dir %q: %w", dir, err)
+		}
+	}
 	dsn := fmt.Sprintf("file:%s?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)", path)
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {

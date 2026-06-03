@@ -34,36 +34,36 @@ const (
 // string; type-assert against ValueType ("str"|"int"|"float"|"bool") to recover
 // the original type.
 type Attribute struct {
-	Key       string
-	ValueType string
-	Value     string
+	Key       string `json:"key"`
+	ValueType string `json:"value_type"`
+	Value     string `json:"value"`
 }
 
 // Span is a single OpenTelemetry span. ParentSpanID is empty for a root span.
 type Span struct {
-	SpanID       string
-	TraceID      string
-	ParentSpanID string
-	Name         string
-	Kind         SpanKind
-	Status       StatusCode
-	StartedNs    int64
-	EndedNs      int64
-	DurationNs   int64
-	Attributes   []Attribute
+	SpanID       string      `json:"span_id"`
+	TraceID      string      `json:"trace_id"`
+	ParentSpanID string      `json:"parent_span_id"`
+	Name         string      `json:"name"`
+	Kind         SpanKind    `json:"kind"`
+	Status       StatusCode  `json:"status"`
+	StartedNs    int64       `json:"started_ns"`
+	EndedNs      int64       `json:"ended_ns"`
+	DurationNs   int64       `json:"duration_ns"`
+	Attributes   []Attribute `json:"attributes,omitempty"`
 }
 
 // Trace is the set of spans sharing one trace ID, plus run-level metadata.
 type Trace struct {
-	TraceID    string
-	RunLabel   string
-	Source     string // "mark" | "otlp"
-	RootName   string
-	StartedNs  int64
-	EndedNs    int64
-	DurationNs int64
-	SpanCount  int
-	Spans      []Span
+	TraceID    string `json:"trace_id"`
+	RunLabel   string `json:"run_label"`
+	Source     string `json:"source"` // "mark" | "otlp"
+	RootName   string `json:"root_name"`
+	StartedNs  int64  `json:"started_ns"`
+	EndedNs    int64  `json:"ended_ns"`
+	DurationNs int64  `json:"duration_ns"`
+	SpanCount  int    `json:"span_count"`
+	Spans      []Span `json:"spans"`
 }
 
 // TreeNode is a span positioned in the parent/child hierarchy, annotated with

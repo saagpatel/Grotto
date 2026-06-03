@@ -45,71 +45,114 @@
 		],
 		"1": [
 			{
-				"test": "collect: grotto run over UDS assembles a trace from marks",
-				"status": "planned"
+				"test": "collect: grotto run over UDS assembles a trace from marks (build binary, end-to-end)",
+				"status": "passing"
 			},
 			{
-				"test": "collect: build-script.sh (5 marks) -> 5 child spans under 1 root",
-				"status": "planned"
+				"test": "collect: 5 marks -> 5 child spans under 1 root",
+				"status": "passing"
+			},
+			{
+				"test": "collect: mark emit over socket, spool fallback, concurrent emit, dedup",
+				"status": "passing"
 			},
 			{
 				"test": "render.layout: per-span bar offsets within +/-1 char on 6-span fixture",
-				"status": "planned"
+				"status": "passing"
 			},
 			{
-				"test": "render.waterfall: grotto show output matches expected-waterfall.txt",
-				"status": "planned"
+				"test": "render.waterfall: show output matches expected-waterfall.txt (golden)",
+				"status": "passing"
+			},
+			{
+				"test": "render: WriteJSON shape (span_count, parent ids), formatDuration units",
+				"status": "passing"
 			}
 		],
 		"2": [
 			{
-				"test": "otlp.mapproto: three-span-trace.json -> 3 spans, attrs + parents preserved",
-				"status": "planned"
+				"test": "otlp.mapproto: 3-span request -> 3 spans, attrs typed (str/int/bool), parents intact",
+				"status": "passing"
 			},
 			{
-				"test": "otlp.grpc: otel-cli export lands a trace with source=otlp",
-				"status": "planned"
+				"test": "otlp.mapproto: spans grouped by trace ID; empty request -> no traces",
+				"status": "passing"
 			},
 			{
-				"test": "otlp.http: POST /v1/traces protobuf body stores a trace",
-				"status": "planned"
+				"test": "otlp.grpc: bufconn Export stores trace with source=otlp",
+				"status": "passing"
 			},
 			{
-				"test": "store: 200-span export, zero database-locked errors across 10 runs",
-				"status": "planned"
+				"test": "otlp.http: POST /v1/traces protobuf + JSON fixture stores a trace",
+				"status": "passing"
+			},
+			{
+				"test": "otlp: gRPC and HTTP ingest of same request yield identical trees",
+				"status": "passing"
+			},
+			{
+				"test": "store: 200-span export, exactly 200 spans, zero lock errors across 10 runs",
+				"status": "passing"
+			},
+			{
+				"test": "otlp.serve: warns when bound to a non-loopback address",
+				"status": "passing"
 			}
 		],
 		"3": [
 			{
-				"test": "tui.app: launches, q quits cleanly, screen transitions work",
-				"status": "planned"
+				"test": "tui.app: run-list -> waterfall transition via enter/select/load; esc pops screens; q quits",
+				"status": "passing"
 			},
 			{
-				"test": "tui.runlist: shows label/span-count/duration; enter opens waterfall",
-				"status": "planned"
+				"test": "tui.runlist: cursor nav clamps; enter emits selectTraceMsg for cursor row; empty list is no-op",
+				"status": "passing"
 			},
 			{
-				"test": "tui.waterfall: 200-span navigation <50ms/keystroke; collapse hides subtree",
-				"status": "planned"
+				"test": "tui.waterfall: collapse root hides all, collapse subtree hides children; enter opens inspector for cursor span",
+				"status": "passing"
 			},
 			{
-				"test": "tui.inspector: enter shows typed attributes; esc returns",
-				"status": "planned"
+				"test": "tui.waterfall: 200-span navigation well under 50ms/keystroke (measured ~50us)",
+				"status": "passing"
+			},
+			{
+				"test": "tui.inspector: renders identity, kind/status labels, typed attributes, duration",
+				"status": "passing"
+			},
+			{
+				"test": "store.RecentTraces: newest-first ordering, limit cap, empty + non-positive limit",
+				"status": "passing"
+			},
+			{
+				"test": "tui helpers: humanAge buckets (s/m/h/d, future clamps to 0), rune-aware truncate",
+				"status": "passing"
 			}
 		],
 		"4": [
 			{
-				"test": "diff: per-span +/- ms deltas on two fixture runs",
-				"status": "planned"
-			},
-			{ "test": "list: last 50 runs newest-first", "status": "planned" },
-			{
-				"test": "store.redact: 4 secret patterns become redacted on ingest",
-				"status": "planned"
+				"test": "render.Diff: matched spans report signed delta; added/removed classified; empty traces -> nil",
+				"status": "passing"
 			},
 			{
-				"test": "build: darwin/arm64 + linux/amd64 static binaries <25MB",
-				"status": "planned"
+				"test": "render.WriteDiff: header + total delta + per-span signed deltas; signedDuration +/-/0",
+				"status": "passing"
+			},
+			{
+				"test": "render.WriteTraceList: newest-first table shape (id/spans/duration/src/age/label); empty placeholder",
+				"status": "passing"
+			},
+			{
+				"test": "store.redact: all 4 secret patterns masked; embedded secret + context; passthrough; InsertTrace round-trip redacted; input not mutated",
+				"status": "passing"
+			},
+			{
+				"test": "render.HumanAge: s/m/h/d buckets, future clamps to 0",
+				"status": "passing"
+			},
+			{
+				"test": "build: make build-all -> darwin/arm64 (Mach-O) + linux/amd64 (ELF static), ~17MB each (<25MB)",
+				"status": "passing"
 			}
 		]
 	}

@@ -4,16 +4,22 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"github.com/saagpatel/grotto/internal/collect"
 )
 
-// newMarkCmd builds `grotto mark` — emit a span record to the run socket from
-// inside an instrumented script. Behavior arrives in Phase 1.
+// newMarkCmd builds `grotto mark <name>` — emit a demarcation point to the active
+// `grotto run`. Each mark opens a child span that ends at the next mark.
 func newMarkCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "mark <name>",
 		Short: "Emit a span mark to the active grotto run",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			return fmt.Errorf("mark: %w (arrives in Phase 1)", errNotImplemented)
+		Args:  cobra.ExactArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			if err := collect.Emit(args[0]); err != nil {
+				return fmt.Errorf("mark: %w", err)
+			}
+			return nil
 		},
 	}
 }

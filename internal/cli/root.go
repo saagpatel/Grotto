@@ -2,16 +2,14 @@
 package cli
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
-)
 
-// errNotImplemented is returned by subcommands whose behavior lands in a later
-// phase. Stubs wrap it with %w so callers can still match on it.
-var errNotImplemented = errors.New("not implemented yet")
+	"github.com/saagpatel/grotto/internal/store"
+)
 
 // NewRootCmd builds the root grotto command with all subcommands registered.
 // Registration is explicit (no package-level init side effects) so the command
@@ -36,6 +34,20 @@ func NewRootCmd() *cobra.Command {
 		newTUICmd(),
 	)
 	return root
+}
+
+// openStore opens the local trace database at its default location (honoring
+// GROTTO_DB). Callers own closing the returned store.
+func openStore(ctx context.Context) (*store.Store, error) {
+	path, err := store.DefaultDBPath()
+	if err != nil {
+		return nil, err
+	}
+	st, err := store.Open(ctx, path)
+	if err != nil {
+		return nil, fmt.Errorf("open store: %w", err)
+	}
+	return st, nil
 }
 
 // Execute runs the root command, printing any error to stderr, and returns the
