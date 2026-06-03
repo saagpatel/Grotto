@@ -75,8 +75,8 @@ func TestHumanAge(t *testing.T) {
 }
 
 func TestFormatTimestamp(t *testing.T) {
-	// Built in time.Local so the assertion is TZ-independent: FormatTimestamp
-	// also renders in local time, so the components round-trip on any machine.
-	tm := time.Date(2026, 6, 3, 9, 8, 5, 123_000_000, time.Local)
-	assert.Equal(t, "2026-06-03 09:08:05.123", FormatTimestamp(tm.UnixNano()))
+	// Rendered in UTC regardless of the machine's zone, matching OTel's canonical
+	// time base, so the assertion holds anywhere.
+	tm := time.Date(2026, 6, 3, 9, 8, 5, 123_000_000, time.UTC)
+	assert.Equal(t, "2026-06-03 09:08:05.123 UTC", FormatTimestamp(tm.UnixNano()))
 }

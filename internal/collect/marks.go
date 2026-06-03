@@ -99,7 +99,7 @@ func Run(ctx context.Context, st *store.Store, argv []string) (string, error) {
 		return "", fmt.Errorf("read spool: %w", err)
 	}
 	// A mark may reach both the socket and the spool (e.g. a slow ack); each is
-	// identified by its (name, timestamp), so dedup collapses it to one span.
+	// identified by its (name, timestamp, child), so dedup collapses it to one span.
 	marks = dedupMarks(append(marks, spooled...))
 
 	status := model.StatusOk
