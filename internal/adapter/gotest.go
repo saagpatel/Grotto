@@ -27,7 +27,7 @@ const jsonFlag = "-json"
 
 // PrepareArgv appends -json to the go test invocation if it is not already
 // present, so the child emits the event stream the adapter parses.
-func (goTestAdapter) PrepareArgv(argv []string) []string {
+func (goTestAdapter) PrepareArgv(argv []string, _ string) []string {
 	for _, arg := range argv {
 		if arg == jsonFlag {
 			return argv

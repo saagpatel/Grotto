@@ -277,7 +277,7 @@ const timingsFlag = "--timings"
 // PrepareArgv appends --timings to argv if it is not already present, ensuring
 // the flag is injected exactly once. Idempotent: if the user already passed
 // --timings or --timings=<format>, no second copy is added.
-func (cargoAdapter) PrepareArgv(argv []string) []string {
+func (cargoAdapter) PrepareArgv(argv []string, _ string) []string {
 	for _, arg := range argv {
 		// Both bare --timings and --timings=html are accepted by cargo;
 		// treat any argument that equals or begins with "--timings" as already

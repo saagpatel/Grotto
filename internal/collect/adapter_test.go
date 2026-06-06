@@ -22,9 +22,9 @@ type stubAdapter struct {
 	spanNames []string // names for spans produced in ParseSpans
 }
 
-func (s *stubAdapter) Name() string                       { return s.name }
-func (s *stubAdapter) PrepareArgv(argv []string) []string { return argv }
-func (s *stubAdapter) CapturesStdout() bool               { return false }
+func (s *stubAdapter) Name() string                                 { return s.name }
+func (s *stubAdapter) PrepareArgv(argv []string, _ string) []string { return argv }
+func (s *stubAdapter) CapturesStdout() bool                         { return false }
 func (s *stubAdapter) ParseSpans(_ context.Context, bc adapter.BuildContext) ([]model.Span, error) {
 	// Build spans anchored just after the run's start so they sort after the root
 	// when GetTrace orders by start_time, keeping assertions straightforward.
@@ -119,9 +119,9 @@ func TestRun_AdapterGraftsSpans(t *testing.T) {
 // truncated timing report.
 type errAdapter struct{}
 
-func (errAdapter) Name() string                       { return "errstub" }
-func (errAdapter) PrepareArgv(argv []string) []string { return argv }
-func (errAdapter) CapturesStdout() bool               { return false }
+func (errAdapter) Name() string                                 { return "errstub" }
+func (errAdapter) PrepareArgv(argv []string, _ string) []string { return argv }
+func (errAdapter) CapturesStdout() bool                         { return false }
 func (errAdapter) ParseSpans(_ context.Context, _ adapter.BuildContext) ([]model.Span, error) {
 	return nil, assert.AnError
 }
@@ -153,9 +153,9 @@ func TestRun_AdapterParseErrorStillStoresTrace(t *testing.T) {
 // Run captures the child's stdout when CapturesStdout is true.
 type stdoutCaptureAdapter struct{ got *[]byte }
 
-func (stdoutCaptureAdapter) Name() string                       { return "stdoutstub" }
-func (stdoutCaptureAdapter) PrepareArgv(argv []string) []string { return argv }
-func (stdoutCaptureAdapter) CapturesStdout() bool               { return true }
+func (stdoutCaptureAdapter) Name() string                                 { return "stdoutstub" }
+func (stdoutCaptureAdapter) PrepareArgv(argv []string, _ string) []string { return argv }
+func (stdoutCaptureAdapter) CapturesStdout() bool                         { return true }
 func (s stdoutCaptureAdapter) ParseSpans(_ context.Context, bc adapter.BuildContext) ([]model.Span, error) {
 	*s.got = bc.Stdout
 	return nil, nil
@@ -208,9 +208,9 @@ func TestRun_NilAdapterUnchanged(t *testing.T) {
 // Adapter and is never reached on the streaming path.
 type streamStubAdapter struct{ lines *[]string }
 
-func (streamStubAdapter) Name() string                       { return "streamstub" }
-func (streamStubAdapter) PrepareArgv(argv []string) []string { return argv }
-func (streamStubAdapter) CapturesStdout() bool               { return true }
+func (streamStubAdapter) Name() string                                 { return "streamstub" }
+func (streamStubAdapter) PrepareArgv(argv []string, _ string) []string { return argv }
+func (streamStubAdapter) CapturesStdout() bool                         { return true }
 func (streamStubAdapter) ParseSpans(context.Context, adapter.BuildContext) ([]model.Span, error) {
 	return nil, nil
 }

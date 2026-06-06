@@ -38,7 +38,7 @@ func TestLookup(t *testing.T) {
 // error text, which must be stable across Go's randomized map iteration).
 func TestNames(t *testing.T) {
 	got := Names()
-	want := []string{"cargo", "go-test"}
+	want := []string{"cargo", "go-test", "junit"}
 	if len(got) != len(want) {
 		t.Fatalf("Names() = %v, want %v", got, want)
 	}
@@ -86,7 +86,7 @@ func TestCargoAdapter_PrepareArgv(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			out := ad.PrepareArgv(tc.input)
+			out := ad.PrepareArgv(tc.input, "")
 			if len(out) != tc.wantLen {
 				t.Errorf("len(PrepareArgv) = %d, want %d; got %v", len(out), tc.wantLen, out)
 			}

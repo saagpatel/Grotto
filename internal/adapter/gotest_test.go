@@ -20,11 +20,11 @@ func TestGoTestAdapter_Basics(t *testing.T) {
 	if !a.CapturesStdout() {
 		t.Error("go-test reads stdout, CapturesStdout must be true")
 	}
-	got := a.PrepareArgv([]string{"go", "test", "./..."})
+	got := a.PrepareArgv([]string{"go", "test", "./..."}, "")
 	if len(got) == 0 || got[len(got)-1] != "-json" {
 		t.Errorf("PrepareArgv must append -json, got %v", got)
 	}
-	if idem := a.PrepareArgv([]string{"go", "test", "-json"}); len(idem) != 3 {
+	if idem := a.PrepareArgv([]string{"go", "test", "-json"}, ""); len(idem) != 3 {
 		t.Errorf("PrepareArgv must be idempotent, got %v", idem)
 	}
 }
