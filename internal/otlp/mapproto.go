@@ -133,8 +133,16 @@ func buildTrace(traceID string, spans []model.Span, label string) model.Trace {
 	if rootName == "" && len(spans) > 0 {
 		rootName = spans[0].Name
 	}
-	if label == "" {
+	// Build a label that distinguishes traces from the same service. The
+	// service.name alone repeats across every request, so append the root span
+	// name (e.g. "checkout-api · POST /checkout"). Fall back to the root name
+	// when there is no service.name, and to the bare service name when it equals
+	// the root (no value in doubling it).
+	switch {
+	case label == "":
 		label = rootName
+	case rootName != "" && rootName != label:
+		label = label + " · " + rootName
 	}
 
 	return model.Trace{
