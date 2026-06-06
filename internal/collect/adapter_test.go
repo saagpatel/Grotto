@@ -23,6 +23,7 @@ type stubAdapter struct {
 
 func (s *stubAdapter) Name() string                       { return s.name }
 func (s *stubAdapter) PrepareArgv(argv []string) []string { return argv }
+func (s *stubAdapter) CapturesStdout() bool               { return false }
 func (s *stubAdapter) ParseSpans(_ context.Context, bc adapter.BuildContext) ([]model.Span, error) {
 	// Build spans anchored just after the run's start so they sort after the root
 	// when GetTrace orders by start_time, keeping assertions straightforward.
@@ -119,6 +120,7 @@ type errAdapter struct{}
 
 func (errAdapter) Name() string                       { return "errstub" }
 func (errAdapter) PrepareArgv(argv []string) []string { return argv }
+func (errAdapter) CapturesStdout() bool               { return false }
 func (errAdapter) ParseSpans(_ context.Context, _ adapter.BuildContext) ([]model.Span, error) {
 	return nil, assert.AnError
 }

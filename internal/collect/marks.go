@@ -98,18 +98,26 @@ func Run(ctx context.Context, st *store.Store, argv []string, ad adapter.Adapter
 
 	startNs := time.Now().UnixNano()
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
-	cmd.Stdin, cmd.Stdout = os.Stdin, os.Stdout
+	cmd.Stdin = os.Stdin
 	cmd.Env = append(os.Environ(), EnvSock+"="+sockPath, EnvSpool+"="+spoolPath)
 
 	// When an adapter is active we tee stderr into a buffer so the adapter can
-	// scan it for the timing report path announcement. The user still sees
-	// cargo's live output because MultiWriter writes to os.Stderr first.
-	// When no adapter is active, wire directly so behavior is unchanged.
-	var stderrBuf bytes.Buffer
-	if ad != nil {
+	// scan it (cargo reads the timing-report path here). The user still sees the
+	// live output because MultiWriter writes to os.Stderr first. When no adapter
+	// is active, wire directly so behavior is unchanged.
+	var stderrBuf, stdoutBuf bytes.Buffer
+	switch {
+	case ad == nil:
+		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+	case ad.CapturesStdout():
+		// The adapter consumes stdout as a machine-readable stream (go test
+		// -json), so capture it silently rather than scrolling raw JSON past
+		// the user; stderr (build/vet errors) still passes through.
+		cmd.Stdout = &stdoutBuf
 		cmd.Stderr = io.MultiWriter(os.Stderr, &stderrBuf)
-	} else {
-		cmd.Stderr = os.Stderr
+	default:
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = io.MultiWriter(os.Stderr, &stderrBuf)
 	}
 
 	runErr := cmd.Run()
@@ -143,6 +151,7 @@ func Run(ctx context.Context, st *store.Store, argv []string, ad adapter.Adapter
 			StartNs:   startNs,
 			EndNs:     endNs,
 			Stderr:    stderrBuf.Bytes(),
+			Stdout:    stdoutBuf.Bytes(),
 			NewSpanID: newSpanID,
 		}
 		adSpans, parseErr := ad.ParseSpans(context.WithoutCancel(ctx), bc)

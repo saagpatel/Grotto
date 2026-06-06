@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -23,8 +24,9 @@ func newRunCmd() *cobra.Command {
 		Short: "Run a command and capture grotto marks into a trace",
 		Long: "Run a command, listening for `grotto mark` calls emitted from inside " +
 			"it, and store the result as one trace rooted at the command.\n\n" +
-			"Use --adapter=cargo to additionally capture per-crate timing from a " +
-			"`cargo build` or `cargo test` run without modifying your source.",
+			"Use --adapter=cargo to capture per-crate timing from a `cargo build`/`cargo " +
+			"test`, or --adapter=go-test to capture per-package/per-test timing from a " +
+			"`go test` run — without modifying your source.",
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
@@ -42,7 +44,7 @@ func newRunCmd() *cobra.Command {
 				var ok bool
 				ad, ok = adapter.Lookup(adapterName)
 				if !ok {
-					return fmt.Errorf("unknown adapter %q (available: cargo)", adapterName)
+					return fmt.Errorf("unknown adapter %q (available: %s)", adapterName, strings.Join(adapter.Names(), ", "))
 				}
 			}
 
@@ -58,7 +60,7 @@ func newRunCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&adapterName, "adapter", "",
-		`build-tool adapter to emit per-unit spans (e.g. cargo)`)
+		"build-tool adapter to emit per-unit spans (cargo, go-test)")
 
 	return cmd
 }
