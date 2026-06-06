@@ -12,6 +12,7 @@ import (
 // waterfall, or as JSON with --json.
 func newShowCmd() *cobra.Command {
 	var asJSON bool
+	var limit int
 	cmd := &cobra.Command{
 		Use:   "show <trace-id>",
 		Short: "Print a static waterfall for a stored trace",
@@ -31,9 +32,11 @@ func newShowCmd() *cobra.Command {
 			if asJSON {
 				return render.WriteJSON(cmd.OutOrStdout(), tr)
 			}
-			return render.WriteWaterfall(cmd.OutOrStdout(), tr)
+			return render.WriteWaterfall(cmd.OutOrStdout(), tr, limit)
 		},
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "output the trace as JSON instead of a waterfall")
+	cmd.Flags().IntVar(&limit, "limit", render.DefaultMaxRows,
+		"max rows per parent before the long tail collapses into a bucket (0 shows all)")
 	return cmd
 }

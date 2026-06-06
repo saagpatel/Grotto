@@ -16,7 +16,11 @@ const barRune = "█"
 // WriteWaterfall renders trace tr as an indented, proportional-bar waterfall to
 // w. Spans are shown in pre-order; each bar is positioned and sized relative to
 // the root span's duration. An empty trace renders a single placeholder line.
-func WriteWaterfall(w io.Writer, tr model.Trace) error {
+//
+// maxRows caps how many real child rows a parent shows before the long tail is
+// collapsed into a "(+N more)" bucket; pass DefaultMaxRows for the standard view
+// or a non-positive value to disable the cap and show every span.
+func WriteWaterfall(w io.Writer, tr model.Trace, maxRows int) error {
 	root := model.AssembleTree(tr.Spans)
 	if root == nil {
 		_, err := io.WriteString(w, "(empty trace)\n")
@@ -31,7 +35,7 @@ func WriteWaterfall(w io.Writer, tr model.Trace) error {
 	// a single bucket row so the waterfall stays legible. Gaps are inserted
 	// first — on the real span set — so their timing calculations are correct
 	// and unaffected by the row reduction that follows.
-	RollupExcess(root, DefaultMaxRows)
+	RollupExcess(root, maxRows)
 	bars := Layout(root, DefaultWidth)
 
 	nameCol := 0

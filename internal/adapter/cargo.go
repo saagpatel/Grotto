@@ -33,6 +33,24 @@ type unit struct {
 	Version  string  `json:"version"`
 	Start    float64 `json:"start"`
 	Duration float64 `json:"duration"`
+	// Target distinguishes units that share a name+version: "" is the normal
+	// library/binary compile, " build-script" is compiling a build.rs, and
+	// " build-script (run)" is executing it. A crate that has a build script and
+	// is also used by a host-side proc-macro can appear three times — Target is
+	// what tells them apart in the waterfall.
+	Target string `json:"target"`
+}
+
+// displayName is the span name for a unit: "<crate> v<version>", suffixed with
+// the cargo target label (e.g. " (build-script)") when it is not the plain
+// library compile, so the three units of a single crate read as distinct rows
+// instead of identical duplicates.
+func (u unit) displayName() string {
+	name := fmt.Sprintf("%s v%s", u.Name, u.Version)
+	if t := strings.TrimSpace(u.Target); t != "" {
+		name += " (" + t + ")"
+	}
+	return name
 }
 
 // parseUnits extracts the UNIT_DATA array embedded in a cargo --timings HTML
@@ -112,7 +130,7 @@ func unitsToSpans(units []unit, rootID, traceID string, startNs int64, newSpanID
 			SpanID:       newSpanID(),
 			TraceID:      traceID,
 			ParentSpanID: rootID,
-			Name:         fmt.Sprintf("%s v%s", u.Name, u.Version),
+			Name:         u.displayName(),
 			Kind:         model.KindInternal,
 			Status:       model.StatusOk,
 			StartedNs:    started,

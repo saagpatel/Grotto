@@ -113,3 +113,23 @@ func TestUnitsToSpans_TimeBase(t *testing.T) {
 		t.Errorf("concurrent units should share a start: %d vs %d", spans[1].StartedNs, spans[0].StartedNs)
 	}
 }
+
+// TestUnitDisplayName_Disambiguation covers the target suffix that keeps the
+// three units of a single crate (lib compile, build-script compile, build-script
+// run) from rendering as identical duplicate rows.
+func TestUnitDisplayName_Disambiguation(t *testing.T) {
+	cases := []struct {
+		name string
+		u    unit
+		want string
+	}{
+		{"plain lib compile (no suffix)", unit{Name: "serde_core", Version: "1.0.228", Target: ""}, "serde_core v1.0.228"},
+		{"build-script compile", unit{Name: "serde_core", Version: "1.0.228", Target: " build-script"}, "serde_core v1.0.228 (build-script)"},
+		{"build-script run", unit{Name: "serde_core", Version: "1.0.228", Target: " build-script (run)"}, "serde_core v1.0.228 (build-script (run))"},
+	}
+	for _, tc := range cases {
+		if got := tc.u.displayName(); got != tc.want {
+			t.Errorf("%s: displayName() = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
