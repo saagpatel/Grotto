@@ -60,7 +60,7 @@ func newRunCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&adapterName, "adapter", "",
-		"build-tool adapter to emit per-unit spans (cargo, go-test)")
+		fmt.Sprintf("build-tool adapter to emit per-unit spans (%s)", strings.Join(adapter.Names(), ", ")))
 
 	return cmd
 }

@@ -84,19 +84,8 @@ func (goTestAdapter) ParseSpans(_ context.Context, bc BuildContext) ([]model.Spa
 		return b
 	}
 
-	sc := bufio.NewScanner(bytes.NewReader(bc.Stdout))
-	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024) // test output lines can be long
-	for sc.Scan() {
-		line := bytes.TrimSpace(sc.Bytes())
-		if len(line) == 0 || line[0] != '{' {
-			continue // non-JSON lines (e.g. a build error printed before the stream)
-		}
-		var e testEvent
-		if json.Unmarshal(line, &e) != nil {
-			continue
-		}
+	handle := func(e testEvent) {
 		ts := clampNs(parseEventTime(e.Time), bc.StartNs, bc.EndNs)
-
 		var b *spanBuilder
 		if e.Test == "" {
 			b = pkgOf(e.Package)
@@ -108,6 +97,24 @@ func (goTestAdapter) ParseSpans(_ context.Context, bc BuildContext) ([]model.Spa
 			}
 		}
 		applyEvent(b, e.Action, ts)
+	}
+
+	// Read line by line with no length cap (bufio.Scanner would silently drop
+	// everything after a line larger than its buffer — a huge test log dump). A
+	// trailing line without a newline is delivered alongside io.EOF, so process
+	// before breaking.
+	r := bufio.NewReader(bytes.NewReader(bc.Stdout))
+	for {
+		line, err := r.ReadBytes('\n')
+		if t := bytes.TrimSpace(line); len(t) > 0 && t[0] == '{' {
+			var e testEvent
+			if json.Unmarshal(t, &e) == nil {
+				handle(e)
+			}
+		}
+		if err != nil {
+			break // io.EOF (or a read error): no more lines
+		}
 	}
 
 	return materialize(pkgs, tests, bc.StartNs, bc.EndNs), nil
