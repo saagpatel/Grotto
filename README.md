@@ -101,6 +101,39 @@ nested-build-script.sh  ██████████████████�
 
 Here `compile` and `link` are `--child` marks subdividing `build`; the `(gap)` under `build` is the unmarked step before the first child, and the leading `(gap)` is startup before the first mark. A child span ends at the very next mark of any kind. See [`tests/fixtures/nested-build-script.sh`](tests/fixtures/nested-build-script.sh).
 
+### Auto-instrument a `cargo build` with `--adapter`
+
+`grotto mark` can't reach inside `cargo build` — cargo owns the compile loop, so the build is one opaque bar. The `cargo` adapter fixes that: it injects `cargo`'s stable `--timings` flag, parses the per-unit report cargo emits, and turns each compiled crate into a child span. No source changes, no instrumentation.
+
+```bash
+# Per-crate waterfall for any cargo build or test
+grotto run --adapter=cargo -- cargo build
+grotto show <trace-id>
+```
+
+```
+cargo                                   ████████████████████████████████████████  5.80s
+  (gap)                                 ███  460ms
+  serde_core v1.0.228 (build-script)      ██  190ms
+  serde_core v1.0.228                       █████████████  960ms
+  syn v2.0.117                              █████████  1.29s
+  regex-automata v0.4.14                     ██████████  1.46s
+  tokio v1.52.3                                 ████████████████████  2.95s
+  (+16 more)                                ████████████████████████████████  5.32s
+```
+
+Crates compile in parallel, so their bars overlap — the waterfall shows that natively. The leading `(gap)` is cargo's own dependency resolution before the first crate. A crate that builds a build script and is also used host-side appears as distinct rows — the bare name is the library compile, `(build-script)` is compiling its `build.rs`, `(build-script (run))` is running it.
+
+A large build can produce hundreds of crates, so the long tail collapses into a single `(+N more)` bucket (its bar spans where those crates ran; its number is their summed compile time). The full span set is always stored — only the static waterfall collapses. Tune or disable the cap:
+
+```bash
+grotto show <trace-id> --limit 50   # show up to 50 rows per parent
+grotto show <trace-id> --limit 0    # show every crate, no bucket
+grotto show <trace-id> --json       # full per-crate data, uncollapsed
+```
+
+The interactive TUI (`grotto tui`) never collapses — you can scroll and inspect every crate. Adapters are pluggable; `cargo` is the first.
+
 ### Receive OTLP spans from an instrumented app
 
 ```bash

@@ -16,12 +16,14 @@ package collect
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -31,6 +33,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/saagpatel/grotto/internal/adapter"
 	"github.com/saagpatel/grotto/internal/model"
 	"github.com/saagpatel/grotto/internal/store"
 )
@@ -59,9 +62,20 @@ type Mark struct {
 // (JSONL spool fallback), assembles them into a single trace rooted at the
 // command, persists it, and returns the trace ID. A non-zero child exit is
 // recorded as an error status on the root span rather than failing the capture.
-func Run(ctx context.Context, st *store.Store, argv []string) (string, error) {
+//
+// ad is an optional build-tool adapter. When non-nil, Run injects any flags
+// the adapter needs (via PrepareArgv), tees stderr so the adapter can scan it
+// for the timing report path, then calls ParseSpans after the command exits and
+// grafts the returned per-unit spans onto the trace. Passing nil preserves the
+// existing behavior exactly — no flags injected, no stderr captured.
+func Run(ctx context.Context, st *store.Store, argv []string, ad adapter.Adapter) (string, error) {
 	if len(argv) == 0 {
 		return "", errors.New("no command given")
+	}
+
+	// Let the adapter prepend/append any flags it needs before we build the Cmd.
+	if ad != nil {
+		argv = ad.PrepareArgv(argv)
 	}
 
 	dir, err := os.MkdirTemp("", "grotto-run-")
@@ -84,8 +98,20 @@ func Run(ctx context.Context, st *store.Store, argv []string) (string, error) {
 
 	startNs := time.Now().UnixNano()
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	cmd.Stdin, cmd.Stdout = os.Stdin, os.Stdout
 	cmd.Env = append(os.Environ(), EnvSock+"="+sockPath, EnvSpool+"="+spoolPath)
+
+	// When an adapter is active we tee stderr into a buffer so the adapter can
+	// scan it for the timing report path announcement. The user still sees
+	// cargo's live output because MultiWriter writes to os.Stderr first.
+	// When no adapter is active, wire directly so behavior is unchanged.
+	var stderrBuf bytes.Buffer
+	if ad != nil {
+		cmd.Stderr = io.MultiWriter(os.Stderr, &stderrBuf)
+	} else {
+		cmd.Stderr = os.Stderr
+	}
+
 	runErr := cmd.Run()
 	endNs := time.Now().UnixNano()
 
@@ -107,6 +133,31 @@ func Run(ctx context.Context, st *store.Store, argv []string) (string, error) {
 		status = model.StatusError
 	}
 	tr := assembleTrace(argv, marks, startNs, endNs, status)
+
+	// When an adapter is active, parse per-unit spans from the timing report and
+	// graft them onto the trace. The root span is always tr.Spans[0].
+	if ad != nil {
+		bc := adapter.BuildContext{
+			RootID:    tr.Spans[0].SpanID,
+			TraceID:   tr.TraceID,
+			StartNs:   startNs,
+			EndNs:     endNs,
+			Stderr:    stderrBuf.Bytes(),
+			NewSpanID: newSpanID,
+		}
+		adSpans, parseErr := ad.ParseSpans(context.WithoutCancel(ctx), bc)
+		if parseErr != nil {
+			// The per-unit spans are an enrichment, not the capture itself: the
+			// command already ran and its root/marks trace is assembled. A failure
+			// to parse the timing report must not discard that trace, so warn and
+			// fall through to store the base trace rather than returning an error.
+			fmt.Fprintf(os.Stderr, "grotto: adapter %q: %v (storing trace without per-unit spans)\n", ad.Name(), parseErr)
+		} else if len(adSpans) > 0 {
+			tr.Spans = append(tr.Spans, adSpans...)
+			tr.SpanCount = len(tr.Spans)
+			tr.Source = ad.Name()
+		}
+	}
 
 	// Persist with a non-cancelable context so a trace is still saved even when
 	// the run was interrupted (which would have canceled ctx).

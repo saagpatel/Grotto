@@ -23,7 +23,7 @@ func goldenPath() string {
 
 func TestWaterfall_Golden(t *testing.T) {
 	var buf bytes.Buffer
-	require.NoError(t, WriteWaterfall(&buf, renderFixtureTrace()))
+	require.NoError(t, WriteWaterfall(&buf, renderFixtureTrace(), DefaultMaxRows))
 
 	if os.Getenv("GROTTO_UPDATE_GOLDEN") != "" {
 		require.NoError(t, os.WriteFile(goldenPath(), buf.Bytes(), 0o644))
@@ -36,7 +36,7 @@ func TestWaterfall_Golden(t *testing.T) {
 
 func TestWaterfall_EmptyTrace(t *testing.T) {
 	var buf bytes.Buffer
-	require.NoError(t, WriteWaterfall(&buf, model.Trace{}))
+	require.NoError(t, WriteWaterfall(&buf, model.Trace{}, DefaultMaxRows))
 	assert.Equal(t, "(empty trace)\n", buf.String())
 }
 

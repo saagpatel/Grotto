@@ -5,17 +5,26 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/saagpatel/grotto/internal/adapter"
 	"github.com/saagpatel/grotto/internal/collect"
 )
 
 // newRunCmd builds `grotto run -- <command> [args...]` — execute a command and
-// capture the grotto marks it emits into a single trace.
+// capture the grotto marks it emits into a single trace. An optional
+// --adapter flag activates a build-tool adapter (e.g. "cargo") that injects
+// tool-specific timing flags and produces per-unit child spans from the
+// build's own timing report, turning an opaque build bar into a crate-level
+// waterfall without any source changes.
 func newRunCmd() *cobra.Command {
-	return &cobra.Command{
+	var adapterName string
+
+	cmd := &cobra.Command{
 		Use:   "run -- <command> [args...]",
 		Short: "Run a command and capture grotto marks into a trace",
 		Long: "Run a command, listening for `grotto mark` calls emitted from inside " +
-			"it, and store the result as one trace rooted at the command.",
+			"it, and store the result as one trace rooted at the command.\n\n" +
+			"Use --adapter=cargo to additionally capture per-crate timing from a " +
+			"`cargo build` or `cargo test` run without modifying your source.",
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
@@ -25,7 +34,19 @@ func newRunCmd() *cobra.Command {
 			}
 			defer func() { _ = st.Close() }()
 
-			id, err := collect.Run(ctx, st, args)
+			// Resolve the adapter: empty string means "no adapter" (nil passed to
+			// collect.Run preserves today's behavior exactly). An unrecognised name
+			// is a user error surfaced immediately so the run does not start.
+			var ad adapter.Adapter
+			if adapterName != "" {
+				var ok bool
+				ad, ok = adapter.Lookup(adapterName)
+				if !ok {
+					return fmt.Errorf("unknown adapter %q (available: cargo)", adapterName)
+				}
+			}
+
+			id, err := collect.Run(ctx, st, args, ad)
 			if err != nil {
 				return fmt.Errorf("run: %w", err)
 			}
@@ -35,4 +56,9 @@ func newRunCmd() *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.Flags().StringVar(&adapterName, "adapter", "",
+		`build-tool adapter to emit per-unit spans (e.g. cargo)`)
+
+	return cmd
 }

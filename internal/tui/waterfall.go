@@ -73,6 +73,10 @@ func newWaterfallModel(tr model.Trace, w, h int) waterfallModel {
 		// that is ever visible is included; narrower widths floor it to 1 char.
 		rootDur := tree.Span.EndedNs - tree.Span.StartedNs
 		render.InsertGaps(tree, render.GapMinNs(rootDur, timelineMax))
+		// Deliberately NO RollupExcess here: the TUI is an interactive, scrollable
+		// inspector, so it shows every span (you can navigate hundreds and drill
+		// into each crate). Only the static `grotto show` dump collapses the tail,
+		// since that output cannot be scrolled.
 	}
 	m := waterfallModel{
 		trace:     tr,
