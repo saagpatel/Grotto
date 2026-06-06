@@ -149,7 +149,7 @@ func (m waterfallModel) View() string {
 	if label == "" {
 		label = m.trace.RootName
 	}
-	header := titleStyle.Render("grotto — "+truncate(label, 60)) +
+	header := titleStyle.Render("grotto — "+render.CleanLabel(label, 60)) +
 		dimStyle.Render(fmt.Sprintf("   %d spans · %s",
 			m.trace.SpanCount, render.FormatDuration(m.trace.DurationNs)))
 	help := helpStyle.Render("  ↑/↓ move · space collapse · enter inspect · esc back · q quit")

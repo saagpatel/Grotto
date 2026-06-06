@@ -3,9 +3,12 @@
 BINARY  := grotto
 PKG     := ./cmd/grotto
 DIST    := dist
+# VERSION is derived from git tags (e.g. v1.2.0, or v1.1.1-2-gabc123-dirty mid-work);
+# plain `go build` without this ldflag falls back to the "dev" default.
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 # -s -w strip the symbol table and DWARF info, keeping the binary well under the
-# 25 MB target without affecting behavior.
-LDFLAGS := -s -w
+# 25 MB target; -X injects the build version into the cli package for `--version`.
+LDFLAGS := -s -w -X github.com/saagpatel/grotto/internal/cli.version=$(VERSION)
 
 .PHONY: build build-all test lint clean
 

@@ -2,6 +2,7 @@ package render
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -82,10 +83,30 @@ func TestWriteDiff_RendersHeaderAndSignedDeltas(t *testing.T) {
 	require.NoError(t, WriteDiff(&buf, a, b, Diff(a, b)))
 	out := buf.String()
 
-	assert.Contains(t, out, "run-a → run-b")
+	assert.Contains(t, out, "diff  run-a", "header leads with the A trace id")
+	assert.Contains(t, out, "→ run-b", "header shows the B trace id after the arrow")
 	assert.Contains(t, out, "compile")
 	assert.Contains(t, out, "+50ns", "matched slower span shows a signed positive delta")
 	assert.Contains(t, out, "-20ns", "matched faster span shows a signed negative delta")
+}
+
+// TestWriteDiff_HeaderDistinguishesPrefixIdenticalLabels guards the regression
+// where truncating both labels to a fixed width made two traces whose commands
+// share a long prefix render identically: the short trace IDs keep them apart.
+func TestWriteDiff_HeaderDistinguishesPrefixIdenticalLabels(t *testing.T) {
+	longCmd := "bash -c grotto mark build CGO_ENABLED=0 go build ./... grotto mark test"
+	a := diffTrace(longCmd, 100, 200, true)
+	a.TraceID = "6e87e1ffbb898f0f5c4aa2bb4f7ad67a"
+	b := diffTrace(longCmd, 150, 180, true)
+	b.TraceID = "551afd0d19e1dd3c650d7539bbc6c5bb"
+
+	var buf bytes.Buffer
+	require.NoError(t, WriteDiff(&buf, a, b, Diff(a, b)))
+	header := strings.SplitN(buf.String(), "\n", 2)[0]
+
+	assert.Contains(t, header, "6e87e1ff", "header carries the A short trace id")
+	assert.Contains(t, header, "551afd0d", "header carries the B short trace id")
+	assert.NotContains(t, header, a.TraceID, "header uses the short id, not the full 32-char key")
 }
 
 func TestSignedDuration(t *testing.T) {
