@@ -78,6 +78,36 @@ func TestComputeCriticalPath_ZeroDurationPredecessorKeepsChain(t *testing.T) {
 	assert.Equal(t, []string{"fast", "slow"}, names, "zero-duration predecessor must stay in the chain")
 }
 
+// TestComputeCriticalPath_EqualTimestampsStayCorrect guards the soundness fix:
+// when a predecessor and its dependent share a StartedNs (cargo's 10ms rounding),
+// the DFS still computes the chain from the edges, not from start order.
+func TestComputeCriticalPath_EqualTimestamps(t *testing.T) {
+	tr := model.Trace{Spans: []model.Span{
+		unitSpan(0, "A", 0, 100, 1), // A unblocks B; both start at 0 (tie)
+		unitSpan(1, "B", 0, 200),
+	}}
+	cp, ok := ComputeCriticalPath(tr)
+	require.True(t, ok)
+	assert.Equal(t, []string{"A", "B"}, []string{cp.Spans[0].Name, cp.Spans[1].Name})
+	assert.Equal(t, int64(300), cp.CriticalNs, "100 + 200 regardless of start-order tie")
+}
+
+// TestComputeCriticalPath_CyclesTerminate ensures a corrupt cyclic graph (a
+// self-edge and a 2-cycle) does not hang and returns a bounded result.
+func TestComputeCriticalPath_CyclesTerminate(t *testing.T) {
+	selfEdge := model.Trace{Spans: []model.Span{unitSpan(0, "loop", 0, 50, 0)}} // unblocks itself
+	cp, ok := ComputeCriticalPath(selfEdge)
+	require.True(t, ok)
+	assert.Equal(t, int64(50), cp.CriticalNs)
+
+	twoCycle := model.Trace{Spans: []model.Span{
+		unitSpan(0, "A", 0, 100, 1),
+		unitSpan(1, "B", 0, 100, 0), // A↔B cycle
+	}}
+	_, ok = ComputeCriticalPath(twoCycle)
+	assert.True(t, ok, "a 2-cycle must terminate and return a result, not hang")
+}
+
 func TestWriteCriticalPath_DegradesWithoutEdges(t *testing.T) {
 	var buf bytes.Buffer
 	require.NoError(t, WriteCriticalPath(&buf, model.Trace{Spans: []model.Span{{SpanID: "r", Name: "x"}}}))

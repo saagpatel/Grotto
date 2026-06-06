@@ -54,6 +54,9 @@ func newShowCmd() *cobra.Command {
 		"show the longest dependency chain (build floor) instead of the waterfall; cargo-adapter traces only")
 	cmd.Flags().BoolVar(&sections, "sections", false,
 		"show cargo per-crate frontend/codegen sub-phases nested under each crate")
+	// These select different renderings; combining them would silently pick one.
+	cmd.MarkFlagsMutuallyExclusive("json", "critical-path")
+	cmd.MarkFlagsMutuallyExclusive("critical-path", "sections")
 	return cmd
 }
 

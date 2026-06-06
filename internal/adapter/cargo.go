@@ -70,7 +70,7 @@ func (s *section) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
-	if len(raw) != 2 {
+	if len(raw) < 2 {
 		return fmt.Errorf("section: want [name, {start,end}], got %d elements", len(raw))
 	}
 	if err := json.Unmarshal(raw[0], &s.Name); err != nil {
@@ -203,8 +203,14 @@ func unitsToSpans(units []unit, rootID, traceID string, startNs int64, newSpanID
 		for _, sec := range u.Sections {
 			ss := started + int64(sec.Start*1e9)
 			se := started + int64(sec.End*1e9)
+			// Keep the sub-phase inside its crate's interval even if the report is
+			// corrupt: clamp the start up to `started` and down to `ended` before
+			// clamping the end, so a section can never begin or end outside the crate.
 			if ss < started {
 				ss = started
+			}
+			if ss > ended {
+				ss = ended
 			}
 			if se > ended {
 				se = ended

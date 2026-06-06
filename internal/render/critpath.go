@@ -3,7 +3,6 @@ package render
 import (
 	"fmt"
 	"io"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -45,57 +44,71 @@ func ComputeCriticalPath(tr model.Trace) (CriticalPath, bool) {
 	}
 
 	// Invert the forward edges (i unblocks j) into predecessor edges (i precedes
-	// j), keeping only edges whose endpoints are present in this trace.
+	// j), dropping self-edges and edges to units absent from this trace.
 	preds := make(map[int][]int)
 	for i, outs := range unblocks {
 		for _, j := range outs {
+			if j == i {
+				continue
+			}
 			if _, ok := spanByUnit[j]; ok {
 				preds[j] = append(preds[j], i)
 			}
 		}
 	}
 
-	// A unit cannot start before all its predecessors finished, so processing in
-	// start-time order is a valid topological order for the longest-path DP.
-	order := make([]int, 0, len(spanByUnit))
-	for i := range spanByUnit {
-		order = append(order, i)
-	}
-	sort.Slice(order, func(a, b int) bool {
-		return spanByUnit[order[a]].StartedNs < spanByUnit[order[b]].StartedNs
-	})
-
-	finish := make(map[int]int64, len(order))
-	back := make(map[int]int, len(order))
-	var totalWork int64
-	end := -1
-	for _, i := range order {
-		dur := spanByUnit[i].DurationNs
-		totalWork += dur
-
-		// best starts below zero so even a zero-duration predecessor is chosen,
-		// keeping the chain intact; reset to 0 when the unit has no predecessor.
+	// Longest finish time via memoized DFS over predecessors. This is robust to
+	// the input ordering (no reliance on start-time being a perfect topological
+	// order, which 10ms-rounded cargo timestamps can violate on a tie) and to a
+	// malformed cyclic graph: a "visiting" unit re-entered through a back-edge
+	// contributes nothing, so the recursion always terminates. back[i] records the
+	// predecessor on i's longest path.
+	finish := make(map[int]int64, len(spanByUnit))
+	back := make(map[int]int, len(spanByUnit))
+	visiting := make(map[int]bool, len(spanByUnit))
+	var longest func(i int) int64
+	longest = func(i int) int64 {
+		if f, done := finish[i]; done {
+			return f
+		}
+		if visiting[i] {
+			return 0 // cycle back-edge: breaks the loop, contributes no time
+		}
+		visiting[i] = true
+		// best below zero so a zero-duration predecessor is still chosen, keeping
+		// the chain intact; reset to 0 when the unit has no usable predecessor.
 		best := int64(-1)
 		bp := -1
 		for _, p := range preds[i] {
-			if finish[p] > best {
-				best = finish[p]
+			if f := longest(p); f > best {
+				best = f
 				bp = p
 			}
 		}
 		if best < 0 {
 			best = 0
 		}
-		finish[i] = best + dur
+		delete(visiting, i)
+		finish[i] = best + spanByUnit[i].DurationNs
 		back[i] = bp
-		if end == -1 || finish[i] > finish[end] {
+		return finish[i]
+	}
+
+	var totalWork int64
+	end := -1
+	for i, s := range spanByUnit {
+		totalWork += s.DurationNs
+		if f := longest(i); end == -1 || f > finish[end] {
 			end = i
 		}
 	}
 
-	// Walk predecessors back from the latest-finishing unit, then reverse.
+	// Walk predecessors back from the latest-finishing unit, then reverse. The
+	// seen guard bounds the walk even if back[] ever formed a cycle.
+	seen := make(map[int]bool, len(spanByUnit))
 	var rev []model.Span
-	for cur := end; cur != -1; cur = back[cur] {
+	for cur := end; cur != -1 && !seen[cur]; cur = back[cur] {
+		seen[cur] = true
 		rev = append(rev, spanByUnit[cur])
 	}
 	spans := make([]model.Span, len(rev))
