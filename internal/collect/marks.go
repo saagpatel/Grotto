@@ -97,27 +97,50 @@ func Run(ctx context.Context, st *store.Store, argv []string, ad adapter.Adapter
 	go c.serve(ln) // owner: this function; exits when ln is closed below
 
 	startNs := time.Now().UnixNano()
+	// Mint the trace + root identity before the command runs. A streaming adapter
+	// needs the root span ID at consume time (to parent its spans) — long before
+	// the post-exit assembleTrace step — so the IDs are generated here and handed
+	// both to the stream and to assembleTrace.
+	traceID := newTraceID()
+	rootID := newSpanID()
+
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Stdin = os.Stdin
 	cmd.Env = append(os.Environ(), EnvSock+"="+sockPath, EnvSpool+"="+spoolPath)
 
-	// When an adapter is active we tee stderr into a buffer so the adapter can
-	// scan it (cargo reads the timing-report path here). The user still sees the
-	// live output because MultiWriter writes to os.Stderr first. When no adapter
-	// is active, wire directly so behavior is unchanged.
+	// Wire the child's stdout/stderr by adapter kind:
+	//   - a streaming adapter parses stdout live through a lineWriter, so the raw
+	//     output is never buffered — only the derived span tree is retained;
+	//   - a buffered stdout-consuming adapter captures stdout silently and parses
+	//     it after exit;
+	//   - cargo / no adapter pass stdout through to the user.
+	// An active adapter also tees stderr into a buffer so it can scan it (cargo
+	// reads the timing-report path there); the user still sees it live via the
+	// MultiWriter writing to os.Stderr first.
 	var stderrBuf, stdoutBuf bytes.Buffer
-	switch {
-	case ad == nil:
-		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-	case ad.CapturesStdout():
-		// The adapter consumes stdout as a machine-readable stream (go test
-		// -json), so capture it silently rather than scrolling raw JSON past
-		// the user; stderr (build/vet errors) still passes through.
-		cmd.Stdout = &stdoutBuf
+	var stream adapter.StreamParser
+	var lw *lineWriter
+	if sa, ok := ad.(adapter.StreamAdapter); ok {
+		stream = sa.NewStream(adapter.StreamInit{
+			RootID:    rootID,
+			TraceID:   traceID,
+			StartNs:   startNs,
+			NewSpanID: newSpanID,
+		})
+		lw = newLineWriter(stream.Consume)
+		cmd.Stdout = lw
 		cmd.Stderr = io.MultiWriter(os.Stderr, &stderrBuf)
-	default:
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = io.MultiWriter(os.Stderr, &stderrBuf)
+	} else {
+		switch {
+		case ad == nil:
+			cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+		case ad.CapturesStdout():
+			cmd.Stdout = &stdoutBuf
+			cmd.Stderr = io.MultiWriter(os.Stderr, &stderrBuf)
+		default:
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = io.MultiWriter(os.Stderr, &stderrBuf)
+		}
 	}
 
 	runErr := cmd.Run()
@@ -140,14 +163,22 @@ func Run(ctx context.Context, st *store.Store, argv []string, ad adapter.Adapter
 	if runErr != nil {
 		status = model.StatusError
 	}
-	tr := assembleTrace(argv, marks, startNs, endNs, status)
+	tr := assembleTrace(argv, marks, startNs, endNs, status, traceID, rootID)
 
-	// When an adapter is active, parse per-unit spans from the timing report and
-	// graft them onto the trace. The root span is always tr.Spans[0].
-	if ad != nil {
+	// Graft adapter spans onto the assembled trace. A streaming adapter has been
+	// consuming stdout live; finalize it now that endNs is known. A buffered adapter
+	// parses its captured output here. Either way the per-unit spans are an
+	// enrichment, not the capture itself: the command already ran and its root/marks
+	// trace is assembled, so a parse failure must warn and keep the base trace
+	// rather than discarding the run.
+	switch {
+	case stream != nil:
+		lw.flush() // emit any trailing partial line before finalizing
+		graftSpans(&tr, stream.Finalize(endNs), ad.Name())
+	case ad != nil:
 		bc := adapter.BuildContext{
-			RootID:    tr.Spans[0].SpanID,
-			TraceID:   tr.TraceID,
+			RootID:    rootID,
+			TraceID:   traceID,
 			StartNs:   startNs,
 			EndNs:     endNs,
 			Stderr:    stderrBuf.Bytes(),
@@ -156,15 +187,9 @@ func Run(ctx context.Context, st *store.Store, argv []string, ad adapter.Adapter
 		}
 		adSpans, parseErr := ad.ParseSpans(context.WithoutCancel(ctx), bc)
 		if parseErr != nil {
-			// The per-unit spans are an enrichment, not the capture itself: the
-			// command already ran and its root/marks trace is assembled. A failure
-			// to parse the timing report must not discard that trace, so warn and
-			// fall through to store the base trace rather than returning an error.
 			fmt.Fprintf(os.Stderr, "grotto: adapter %q: %v (storing trace without per-unit spans)\n", ad.Name(), parseErr)
-		} else if len(adSpans) > 0 {
-			tr.Spans = append(tr.Spans, adSpans...)
-			tr.SpanCount = len(tr.Spans)
-			tr.Source = ad.Name()
+		} else {
+			graftSpans(&tr, adSpans, ad.Name())
 		}
 	}
 
@@ -174,6 +199,19 @@ func Run(ctx context.Context, st *store.Store, argv []string, ad adapter.Adapter
 		return "", fmt.Errorf("store trace: %w", err)
 	}
 	return tr.TraceID, nil
+}
+
+// graftSpans appends an adapter's per-unit spans onto the assembled trace and marks
+// the trace as sourced from that adapter. Empty span sets are a no-op (a failed
+// build that emitted no report), so the base root/marks trace is left untouched.
+// Shared by the streaming and buffered graft paths so they cannot drift.
+func graftSpans(tr *model.Trace, spans []model.Span, source string) {
+	if len(spans) == 0 {
+		return
+	}
+	tr.Spans = append(tr.Spans, spans...)
+	tr.SpanCount = len(tr.Spans)
+	tr.Source = source
 }
 
 // collector accumulates marks received on the run socket.
@@ -282,11 +320,9 @@ func readSpool(path string) ([]Mark, error) {
 // assembleTrace turns a set of marks into a trace: one root span covering the
 // whole command, and one child span per mark spanning from that mark to the next
 // (or to the command's end for the final mark).
-func assembleTrace(argv []string, marks []Mark, startNs, endNs int64, status model.StatusCode) model.Trace {
+func assembleTrace(argv []string, marks []Mark, startNs, endNs int64, status model.StatusCode, traceID, rootID string) model.Trace {
 	sort.SliceStable(marks, func(i, j int) bool { return marks[i].TSNs < marks[j].TSNs })
 
-	traceID := newTraceID()
-	rootID := newSpanID()
 	rootName := filepath.Base(argv[0])
 
 	// newSpan builds an internal-kind span, deriving duration from the bounds.

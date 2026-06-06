@@ -23,7 +23,7 @@ func TestAssembleTrace_MarksBecomeChildSpans(t *testing.T) {
 		{Name: "setup", TSNs: 100},
 		{Name: "compile", TSNs: 200},
 	}
-	tr := assembleTrace([]string{"/path/build.sh", "--release"}, marks, 50, 500, model.StatusOk)
+	tr := assembleTrace([]string{"/path/build.sh", "--release"}, marks, 50, 500, model.StatusOk, newTraceID(), newSpanID())
 
 	assert.Equal(t, 4, tr.SpanCount, "1 root + 3 marks")
 	require.Len(t, tr.Spans, 4)
@@ -64,7 +64,7 @@ func TestAssembleTrace_ChildMarksNest(t *testing.T) {
 		{Name: "ld", TSNs: 300, Child: true},
 		{Name: "test", TSNs: 400},
 	}
-	tr := assembleTrace([]string{"build.sh"}, marks, 50, 500, model.StatusOk)
+	tr := assembleTrace([]string{"build.sh"}, marks, 50, 500, model.StatusOk, newTraceID(), newSpanID())
 	require.Equal(t, 6, tr.SpanCount, "1 root + 5 marks")
 
 	byName := make(map[string]model.Span, len(tr.Spans))
@@ -104,7 +104,7 @@ func TestAssembleTrace_ChildMarksNest(t *testing.T) {
 func TestAssembleTrace_LeadingChildDegradesToRoot(t *testing.T) {
 	// A --child mark with no open section parents to the root rather than dangling.
 	marks := []Mark{{Name: "orphan", TSNs: 100, Child: true}}
-	tr := assembleTrace([]string{"build.sh"}, marks, 50, 500, model.StatusOk)
+	tr := assembleTrace([]string{"build.sh"}, marks, 50, 500, model.StatusOk, newTraceID(), newSpanID())
 	require.Len(t, tr.Spans, 2)
 	root, orphan := tr.Spans[0], tr.Spans[1]
 	assert.Equal(t, root.SpanID, orphan.ParentSpanID, "leading --child falls back to root")
