@@ -267,6 +267,10 @@ type cargoAdapter struct{}
 // use this adapter.
 func (cargoAdapter) Name() string { return "cargo" }
 
+// CapturesStdout is false: the cargo adapter reads the timing-report path from
+// stderr, and the child's stdout passes through to the user untouched.
+func (cargoAdapter) CapturesStdout() bool { return false }
+
 // timingsFlag is the stable-cargo flag that activates the HTML timing report.
 const timingsFlag = "--timings"
 

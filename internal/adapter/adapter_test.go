@@ -34,6 +34,21 @@ func TestLookup(t *testing.T) {
 	})
 }
 
+// TestNames verifies the registry names are returned sorted (used in help and
+// error text, which must be stable across Go's randomized map iteration).
+func TestNames(t *testing.T) {
+	got := Names()
+	want := []string{"cargo", "go-test"}
+	if len(got) != len(want) {
+		t.Fatalf("Names() = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("Names()[%d] = %q, want %q (must be sorted)", i, got[i], want[i])
+		}
+	}
+}
+
 // TestCargoAdapter_PrepareArgv verifies that --timings is injected exactly once
 // and that existing flags are never duplicated.
 func TestCargoAdapter_PrepareArgv(t *testing.T) {

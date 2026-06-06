@@ -193,6 +193,27 @@ grotto show <trace-id> --sections
 
 `serde_core` spends 94% of its time in the frontend — it's trait/generics-bound, so codegen optimization flags won't help it; a codegen-heavy crate is the opposite. The sub-phases are stored on every cargo trace (visible in `--json` and the interactive TUI) but hidden from the default waterfall to keep it uncluttered.
 
+### Auto-instrument `go test` with `--adapter`
+
+The adapter mechanism is pluggable — `cargo` is one, `go-test` is another. `grotto run --adapter=go-test` injects `-json`, parses the event stream, and turns a slow test run into a package → test waterfall:
+
+```bash
+grotto run --adapter=go-test -- go test ./...
+grotto show <trace-id> --limit 10
+```
+
+```
+go                                ████████████████████████████████████████  231ms
+  (gap)                           █████████████████████  120ms
+  internal/render                                       █  611µs
+    (+55 more)                                          █  404µs
+    TestInsertGaps                                      █  72µs
+  internal/adapter                                       █  7ms
+    ...
+```
+
+Per-test spans carry pass/fail status (failed tests get the `!` marker), and the leading `(gap)` is `go test`'s own compile-before-run time. Two runs diff cleanly — `grotto diff <a> <b> --sort=delta` surfaces which tests got slower. (Adding an adapter is one file plus one registry line; `critical-path` and `--sections` are cargo-specific and degrade gracefully on go-test traces.)
+
 ### Receive OTLP spans from an instrumented app
 
 ```bash

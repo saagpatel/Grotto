@@ -23,6 +23,7 @@ type stubAdapter struct {
 
 func (s *stubAdapter) Name() string                       { return s.name }
 func (s *stubAdapter) PrepareArgv(argv []string) []string { return argv }
+func (s *stubAdapter) CapturesStdout() bool               { return false }
 func (s *stubAdapter) ParseSpans(_ context.Context, bc adapter.BuildContext) ([]model.Span, error) {
 	// Build spans anchored just after the run's start so they sort after the root
 	// when GetTrace orders by start_time, keeping assertions straightforward.
@@ -119,6 +120,7 @@ type errAdapter struct{}
 
 func (errAdapter) Name() string                       { return "errstub" }
 func (errAdapter) PrepareArgv(argv []string) []string { return argv }
+func (errAdapter) CapturesStdout() bool               { return false }
 func (errAdapter) ParseSpans(_ context.Context, _ adapter.BuildContext) ([]model.Span, error) {
 	return nil, assert.AnError
 }
@@ -144,6 +146,36 @@ func TestRun_AdapterParseErrorStillStoresTrace(t *testing.T) {
 	tr, err := st.GetTrace(ctx, id)
 	require.NoError(t, err)
 	assert.Equal(t, 1, tr.SpanCount, "base trace (root only) must survive an adapter parse failure")
+}
+
+// stdoutCaptureAdapter records the stdout bytes handed to ParseSpans, to prove
+// Run captures the child's stdout when CapturesStdout is true.
+type stdoutCaptureAdapter struct{ got *[]byte }
+
+func (stdoutCaptureAdapter) Name() string                       { return "stdoutstub" }
+func (stdoutCaptureAdapter) PrepareArgv(argv []string) []string { return argv }
+func (stdoutCaptureAdapter) CapturesStdout() bool               { return true }
+func (s stdoutCaptureAdapter) ParseSpans(_ context.Context, bc adapter.BuildContext) ([]model.Span, error) {
+	*s.got = bc.Stdout
+	return nil, nil
+}
+
+// TestRun_CapturesStdout verifies the CapturesStdout=true path: the child's
+// stdout is captured into BuildContext.Stdout (rather than only echoed) so a
+// stdout-stream adapter like go-test can parse it.
+func TestRun_CapturesStdout(t *testing.T) {
+	if testing.Short() {
+		t.Skip("spawns a subprocess")
+	}
+	ctx := context.Background()
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "grotto.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = st.Close() })
+
+	var captured []byte
+	_, err = Run(ctx, st, []string{"sh", "-c", "printf 'hello-stdout'"}, stdoutCaptureAdapter{got: &captured})
+	require.NoError(t, err)
+	assert.Equal(t, "hello-stdout", string(captured), "child stdout must reach BuildContext.Stdout")
 }
 
 // TestRun_NilAdapterUnchanged verifies that passing nil for the adapter leaves
