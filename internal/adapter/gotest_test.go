@@ -2,6 +2,8 @@ package adapter
 
 import (
 	"context"
+	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -103,5 +105,71 @@ func TestGoTestAdapter_ParseSpans(t *testing.T) {
 	}
 	if hang.EndedNs != bc.EndNs {
 		t.Errorf("incomplete TestHang must end at EndNs %d, got %d", bc.EndNs, hang.EndedNs)
+	}
+}
+
+// TestGoTestStream_MatchesBufferedParse is the streaming-refactor safety net: the
+// live driver (NewStream + Consume per line + Finalize) must produce byte-identical
+// spans to the buffered driver (ParseSpans over the whole stream). Because both feed
+// builders in the same line order with identical fresh ID counters, the same logical
+// span gets the same ID; only materialize's map-iteration order differs, so sorting
+// by SpanID makes the two directly comparable. This is what lets Run trust streaming.
+func TestGoTestStream_MatchesBufferedParse(t *testing.T) {
+	parseNs := func(s string) int64 {
+		tm, err := time.Parse(time.RFC3339Nano, s)
+		if err != nil {
+			t.Fatalf("parse %q: %v", s, err)
+		}
+		return tm.UnixNano()
+	}
+	lines := []string{
+		`{"Time":"2026-06-06T05:08:39.10Z","Action":"start","Package":"pkg/a"}`,
+		`{"Time":"2026-06-06T05:08:39.11Z","Action":"run","Package":"pkg/a","Test":"TestPass"}`,
+		`{"Time":"2026-06-06T05:08:39.12Z","Action":"output","Package":"pkg/a","Test":"TestPass"}`, // ignored event, no builder
+		`{"Time":"2026-06-06T05:08:39.15Z","Action":"pass","Package":"pkg/a","Test":"TestPass","Elapsed":0.04}`,
+		`{"Time":"2026-06-06T05:08:39.16Z","Action":"run","Package":"pkg/b","Test":"TestFail"}`,
+		`{"Time":"2026-06-06T05:08:39.20Z","Action":"fail","Package":"pkg/b","Test":"TestFail","Elapsed":0.04}`,
+		`{"Time":"2026-06-06T05:08:39.25Z","Action":"run","Package":"pkg/b","Test":"TestHang"}`, // no end event
+		`{"Time":"2026-06-06T05:08:39.30Z","Action":"fail","Package":"pkg/b","Elapsed":0.2}`,
+		``,         // blank line tolerated by both drivers
+		`not json`, // non-JSON tolerated by both drivers
+	}
+	start := parseNs("2026-06-06T05:08:39.00Z")
+	end := parseNs("2026-06-06T05:08:39.30Z")
+
+	// Buffered driver over the joined stream.
+	cnt1 := 0
+	bc := BuildContext{
+		RootID: "root", TraceID: "tr", StartNs: start, EndNs: end,
+		Stdout:    []byte(strings.Join(lines, "\n")),
+		NewSpanID: func() string { cnt1++; return "s" + strconv.Itoa(cnt1) },
+	}
+	buffered, err := goTestAdapter{}.ParseSpans(context.Background(), bc)
+	if err != nil {
+		t.Fatalf("buffered ParseSpans: %v", err)
+	}
+
+	// Streaming driver fed line by line, with an identical fresh ID counter.
+	cnt2 := 0
+	s := goTestAdapter{}.NewStream(StreamInit{
+		RootID: "root", TraceID: "tr", StartNs: start,
+		NewSpanID: func() string { cnt2++; return "s" + strconv.Itoa(cnt2) },
+	})
+	for _, ln := range lines {
+		s.Consume([]byte(ln))
+	}
+	streamed := s.Finalize(end)
+
+	sortBySpanID := func(spans []model.Span) {
+		sort.Slice(spans, func(i, j int) bool { return spans[i].SpanID < spans[j].SpanID })
+	}
+	sortBySpanID(buffered)
+	sortBySpanID(streamed)
+
+	if len(buffered) == 0 {
+		t.Fatal("expected spans from the buffered driver, got none")
+	}
+	if !reflect.DeepEqual(buffered, streamed) {
+		t.Fatalf("streaming parse diverged from buffered:\n buffered=%+v\n streamed=%+v", buffered, streamed)
 	}
 }

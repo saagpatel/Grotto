@@ -74,6 +74,50 @@ type Adapter interface {
 	ParseSpans(ctx context.Context, bc BuildContext) ([]model.Span, error)
 }
 
+// StreamAdapter is an Adapter that consumes the child's stdout as a live stream,
+// folding each line into span state as it arrives rather than buffering the whole
+// stream and parsing after the command exits. Run drives it through a line-splitting
+// writer, so the raw output is never accumulated in memory — only the derived span
+// tree is. An adapter opts into streaming simply by implementing this interface;
+// Run type-asserts for it (`ad.(StreamAdapter)`) and falls back to the buffered
+// ParseSpans path otherwise, so file-reader adapters like cargo are unaffected.
+type StreamAdapter interface {
+	Adapter
+
+	// NewStream begins a streaming parse, returning a StreamParser seeded with the
+	// root identity and run-start anchor. It is called exactly once, before the
+	// command runs, so the parser can parent its spans without waiting for the
+	// post-exit assembleTrace step.
+	NewStream(init StreamInit) StreamParser
+}
+
+// StreamInit seeds a StreamParser with everything fixed before the command runs:
+// the pre-generated root identity its spans parent under, the trace ID they carry,
+// the run-start anchor, and the span-ID factory (shared with collect so ID
+// generation stays centralized and tests can inject a deterministic counter).
+type StreamInit struct {
+	RootID    string
+	TraceID   string
+	StartNs   int64
+	NewSpanID func() string
+}
+
+// StreamParser folds a live stdout stream into spans. Run calls Consume for each
+// line as it arrives, then Finalize once the command has exited and the run-end
+// timestamp is known.
+type StreamParser interface {
+	// Consume folds one line of the child's stdout into span state. It is called
+	// inline from Run's stdout pump (os/exec's internal copy goroutine, joined by
+	// cmd.Wait), so it must not block and must not retain the line slice past the
+	// call. Blank, non-JSON, or unmodeled lines are ignored by the implementation.
+	Consume(line []byte)
+
+	// Finalize materializes the accumulated state into spans once the command has
+	// exited and endNs is known. It cannot fail: a degenerate stream finalizes to
+	// whatever spans accumulated (possibly none), never an error.
+	Finalize(endNs int64) []model.Span
+}
+
 // adapters is the global registry: flag value → Adapter. Adding an adapter is a
 // one-line addition here plus a new file; no interface registration machinery needed.
 var adapters = map[string]Adapter{

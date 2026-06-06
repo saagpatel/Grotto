@@ -3,6 +3,7 @@ package collect
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -199,4 +200,95 @@ func TestRun_NilAdapterUnchanged(t *testing.T) {
 
 	assert.Equal(t, 1, tr.SpanCount, "nil adapter: only the root span")
 	assert.Equal(t, "mark", tr.Source, "nil adapter: source stays mark")
+}
+
+// streamStubAdapter is an in-test StreamAdapter: it records every line handed to
+// Consume (proving Run drives the stream live, not from a post-exit buffer) and
+// emits one span per non-blank line in Finalize. ParseSpans exists only to satisfy
+// Adapter and is never reached on the streaming path.
+type streamStubAdapter struct{ lines *[]string }
+
+func (streamStubAdapter) Name() string                       { return "streamstub" }
+func (streamStubAdapter) PrepareArgv(argv []string) []string { return argv }
+func (streamStubAdapter) CapturesStdout() bool               { return true }
+func (streamStubAdapter) ParseSpans(context.Context, adapter.BuildContext) ([]model.Span, error) {
+	return nil, nil
+}
+func (s streamStubAdapter) NewStream(init adapter.StreamInit) adapter.StreamParser {
+	return &streamStub{init: init, lines: s.lines}
+}
+
+type streamStub struct {
+	init  adapter.StreamInit
+	lines *[]string
+}
+
+func (s *streamStub) Consume(line []byte) {
+	if t := strings.TrimSpace(string(line)); t != "" {
+		*s.lines = append(*s.lines, t)
+	}
+}
+
+func (s *streamStub) Finalize(_ int64) []model.Span {
+	out := make([]model.Span, 0, len(*s.lines))
+	for i, name := range *s.lines {
+		started := s.init.StartNs + int64(i+1)*1_000_000
+		out = append(out, model.Span{
+			SpanID:       s.init.NewSpanID(),
+			TraceID:      s.init.TraceID,
+			ParentSpanID: s.init.RootID,
+			Name:         name,
+			Kind:         model.KindInternal,
+			Status:       model.StatusOk,
+			StartedNs:    started,
+			EndedNs:      started + 1_000_000,
+			DurationNs:   1_000_000,
+		})
+	}
+	return out
+}
+
+// TestRun_StreamAdapterConsumesLive verifies the streaming seam end to end: Run
+// detects a StreamAdapter, drives its Consume with the child's stdout line by line
+// during the run (never buffering the whole stream), then grafts Finalize's spans
+// under the assembled root with the trace's ID.
+func TestRun_StreamAdapterConsumesLive(t *testing.T) {
+	if testing.Short() {
+		t.Skip("spawns a subprocess")
+	}
+	ctx := context.Background()
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "grotto.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = st.Close() })
+
+	var lines []string
+	stub := streamStubAdapter{lines: &lines}
+	id, err := Run(ctx, st, []string{"sh", "-c", "printf 'alpha\\nbeta\\ngamma\\n'"}, stub)
+	require.NoError(t, err)
+
+	// Consume saw every stdout line, proving the live (not buffered) path ran.
+	assert.Equal(t, []string{"alpha", "beta", "gamma"}, lines, "stream must consume each stdout line")
+
+	tr, err := st.GetTrace(ctx, id)
+	require.NoError(t, err)
+	assert.Equal(t, "streamstub", tr.Source, "Trace.Source must be the adapter name")
+	assert.Equal(t, 4, tr.SpanCount, "1 root + 3 streamed spans")
+
+	var root model.Span
+	names := make(map[string]bool)
+	for _, sp := range tr.Spans {
+		if sp.ParentSpanID == "" {
+			root = sp
+		} else {
+			names[sp.Name] = true
+		}
+	}
+	require.NotEmpty(t, root.SpanID, "must find exactly one root span")
+	for _, sp := range tr.Spans {
+		if sp.ParentSpanID != "" {
+			assert.Equal(t, root.SpanID, sp.ParentSpanID, "streamed span %q must parent to root", sp.Name)
+			assert.Equal(t, tr.TraceID, sp.TraceID, "streamed span %q must carry the trace ID", sp.Name)
+		}
+	}
+	assert.True(t, names["alpha"] && names["beta"] && names["gamma"], "all three streamed spans must be present")
 }
