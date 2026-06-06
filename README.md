@@ -80,6 +80,27 @@ grotto mark "test"
 
 `grotto run` sets `GROTTO_SOCK` and `GROTTO_SPOOL` in the child's environment. Each `grotto mark <name>` call opens the socket, writes a JSON record, and waits for a one-byte acknowledgement — so the mark is durably held before the `grotto mark` process exits. If the socket is unreachable (e.g. nested subshell), the mark spools to `GROTTO_SPOOL` instead. N marks produce N child spans under one root span covering the full command duration.
 
+### Subdivide a section with `--child`
+
+A `grotto mark <name> --child` nests one level under the most recent non-child mark, subdividing that section — useful for breaking a coarse phase into its sub-steps. Any time inside a parent not covered by a marked child renders as a `(gap)` row, so unaccounted work (a `go vet` before the compile, setup before the first mark) stays visible instead of vanishing into the parent's bar.
+
+```bash
+grotto run -- tests/fixtures/nested-build-script.sh
+grotto show <trace-id>
+```
+
+```
+nested-build-script.sh  ████████████████████████████████████████  370ms
+  (gap)                 ██  18ms
+  build                   █████████████████████████████  267ms
+    (gap)                 █████████  79ms
+    compile                        █████████████  118ms
+    link                                       ███████  68ms
+  test                                                 █████████  85ms
+```
+
+Here `compile` and `link` are `--child` marks subdividing `build`; the `(gap)` under `build` is the unmarked step before the first child, and the leading `(gap)` is startup before the first mark. A child span ends at the very next mark of any kind. See [`tests/fixtures/nested-build-script.sh`](tests/fixtures/nested-build-script.sh).
+
 ### Receive OTLP spans from an instrumented app
 
 ```bash
