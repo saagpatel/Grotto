@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"testing"
 )
 
@@ -131,6 +132,61 @@ func TestUnitDisplayName_Disambiguation(t *testing.T) {
 		if got := tc.u.displayName(); got != tc.want {
 			t.Errorf("%s: displayName() = %q, want %q", tc.name, got, tc.want)
 		}
+	}
+}
+
+// TestSectionUnmarshalJSON decodes cargo's [name, {start,end}] tuple shape and
+// rejects a malformed (non-2-element) tuple.
+func TestSectionUnmarshalJSON(t *testing.T) {
+	var s section
+	if err := s.UnmarshalJSON([]byte(`["frontend", {"start": 0.0, "end": 0.06}]`)); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if s.Name != "frontend" || s.Start != 0.0 || s.End != 0.06 {
+		t.Errorf("got %+v, want frontend 0.0-0.06", s)
+	}
+	if err := s.UnmarshalJSON([]byte(`["only-one"]`)); err == nil {
+		t.Error("expected error on a 1-element tuple")
+	}
+}
+
+// TestUnitsToSpans_Sections verifies sub-phase children: a unit with sections
+// yields the crate span plus one child per section, parented to the crate,
+// marked with AttrSection, with times clamped inside the crate interval. A unit
+// with no sections yields just the crate span.
+func TestUnitsToSpans_Sections(t *testing.T) {
+	const startNs = int64(1_000_000_000_000)
+	n := 0
+	ids := func() string { n++; return "id" + strconv.Itoa(n) }
+	units := []unit{{
+		Index: 0, Name: "memchr", Version: "2.8.1", Start: 0.0, Duration: 0.30,
+		Sections: []section{{"frontend", 0.0, 0.24}, {"codegen", 0.24, 0.30}},
+	}}
+
+	spans := unitsToSpans(units, "root", "tr", startNs, ids)
+	if len(spans) != 3 {
+		t.Fatalf("got %d spans, want 3 (crate + 2 sections)", len(spans))
+	}
+	crate := spans[0]
+	for _, child := range spans[1:] {
+		if child.ParentSpanID != crate.SpanID {
+			t.Errorf("section %q parent = %q, want crate %q", child.Name, child.ParentSpanID, crate.SpanID)
+		}
+		if child.StartedNs < crate.StartedNs || child.EndedNs > crate.EndedNs {
+			t.Errorf("section %q [%d,%d] escapes crate [%d,%d]", child.Name, child.StartedNs, child.EndedNs, crate.StartedNs, crate.EndedNs)
+		}
+		if len(child.Attributes) != 1 || child.Attributes[0].Key != AttrSection {
+			t.Errorf("section %q must carry exactly the %s attribute, got %v", child.Name, AttrSection, child.Attributes)
+		}
+	}
+	if spans[1].Name != "frontend" || spans[2].Name != "codegen" {
+		t.Errorf("section names = %q,%q want frontend,codegen", spans[1].Name, spans[2].Name)
+	}
+
+	// A unit with no sections produces only its crate span.
+	plain := unitsToSpans([]unit{{Index: 1, Name: "x", Version: "1.0"}}, "root", "tr", startNs, ids)
+	if len(plain) != 1 {
+		t.Fatalf("unit without sections: got %d spans, want 1", len(plain))
 	}
 }
 

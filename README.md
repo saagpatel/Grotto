@@ -174,6 +174,25 @@ critical path  1.82s  (the build's floor)
 
 Read it as a story: 6.78s of compile *work* ran in 2.97s of wall-clock thanks to parallelism, but it can't drop below **1.82s** because `serde_derive` (a proc-macro) can't compile until `syn` finishes, and `serde` can't expand its derives until `serde_derive` finishes. Throwing more cores at this build won't help — shortening that chain (or the proc-macro) will. (Only `--adapter=cargo` traces carry dependency edges; the flag degrades with a clear message on other traces.)
 
+#### Frontend vs codegen: why a crate is slow
+
+cargo splits each crate's compile into a *frontend* phase (parse, type-check, borrow-check, macro expansion) and a *codegen* phase (LLVM codegen + optimization). Grotto stores both as sub-spans; `grotto show --sections` nests them under each crate:
+
+```bash
+grotto show <trace-id> --sections
+```
+
+```
+  serde_core v1.0.228   █████████████  940ms
+    frontend            ████████████  880ms
+    codegen             █  60ms
+  syn v2.0.117          █████████  690ms
+    frontend            ████████  600ms
+    codegen             █  90ms
+```
+
+`serde_core` spends 94% of its time in the frontend — it's trait/generics-bound, so codegen optimization flags won't help it; a codegen-heavy crate is the opposite. The sub-phases are stored on every cargo trace (visible in `--json` and the interactive TUI) but hidden from the default waterfall to keep it uncluttered.
+
 ### Receive OTLP spans from an instrumented app
 
 ```bash

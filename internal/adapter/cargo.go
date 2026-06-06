@@ -44,6 +44,47 @@ type unit struct {
 	// are stamped onto each span as attributes so the critical-path analysis can
 	// reconstruct the graph from a stored trace.
 	UnblockedUnits []int `json:"unblocked_units"`
+	// Sections are the unit's compile sub-phases (frontend = parse/typecheck/
+	// borrow-check, codegen = LLVM codegen/optimization), with times relative to
+	// the unit's own start. Null for units that do not split (build scripts,
+	// their runs, some proc-macros and binaries).
+	Sections []section `json:"sections"`
+}
+
+// AttrSection marks a span as a cargo compile sub-phase (frontend/codegen). The
+// `grotto show` waterfall hides these by default and reveals them with
+// --sections; critical-path and rollup ignore them via this marker.
+const AttrSection = "cargo.section"
+
+// section is one compile sub-phase of a unit. Cargo encodes it as a 2-tuple
+// [name, {start,end}], with start/end in seconds relative to the unit's start.
+type section struct {
+	Name  string
+	Start float64
+	End   float64
+}
+
+// UnmarshalJSON decodes cargo's ["<name>", {"start":..,"end":..}] tuple shape.
+func (s *section) UnmarshalJSON(b []byte) error {
+	var raw []json.RawMessage
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	if len(raw) != 2 {
+		return fmt.Errorf("section: want [name, {start,end}], got %d elements", len(raw))
+	}
+	if err := json.Unmarshal(raw[0], &s.Name); err != nil {
+		return fmt.Errorf("section name: %w", err)
+	}
+	var span struct {
+		Start float64 `json:"start"`
+		End   float64 `json:"end"`
+	}
+	if err := json.Unmarshal(raw[1], &span); err != nil {
+		return fmt.Errorf("section span: %w", err)
+	}
+	s.Start, s.End = span.Start, span.End
+	return nil
 }
 
 // displayName is the span name for a unit: "<crate> v<version>", suffixed with
@@ -142,8 +183,9 @@ func unitsToSpans(units []unit, rootID, traceID string, startNs int64, newSpanID
 		if ended < started {
 			ended = started
 		}
+		crateID := newSpanID()
 		spans = append(spans, model.Span{
-			SpanID:       newSpanID(),
+			SpanID:       crateID,
 			TraceID:      traceID,
 			ParentSpanID: rootID,
 			Name:         u.displayName(),
@@ -154,6 +196,35 @@ func unitsToSpans(units []unit, rootID, traceID string, startNs int64, newSpanID
 			DurationNs:   ended - started,
 			Attributes:   u.dagAttrs(),
 		})
+
+		// Sub-phase children (frontend/codegen), parented to this crate. Their
+		// cargo times are relative to the unit's start; clamp inside the crate's
+		// interval so a corrupt report cannot push a sub-phase outside its parent.
+		for _, sec := range u.Sections {
+			ss := started + int64(sec.Start*1e9)
+			se := started + int64(sec.End*1e9)
+			if ss < started {
+				ss = started
+			}
+			if se > ended {
+				se = ended
+			}
+			if se < ss {
+				se = ss
+			}
+			spans = append(spans, model.Span{
+				SpanID:       newSpanID(),
+				TraceID:      traceID,
+				ParentSpanID: crateID,
+				Name:         sec.Name,
+				Kind:         model.KindInternal,
+				Status:       model.StatusOk,
+				StartedNs:    ss,
+				EndedNs:      se,
+				DurationNs:   se - ss,
+				Attributes:   []model.Attribute{{Key: AttrSection, ValueType: "str", Value: sec.Name}},
+			})
+		}
 	}
 	return spans
 }
