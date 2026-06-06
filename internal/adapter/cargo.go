@@ -9,8 +9,11 @@ package adapter
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/saagpatel/grotto/internal/model"
 )
@@ -118,4 +121,80 @@ func unitsToSpans(units []unit, rootID, traceID string, startNs int64, newSpanID
 		})
 	}
 	return spans
+}
+
+// cargoAdapter implements Adapter for `cargo build` and `cargo test` runs.
+// It injects --timings into the cargo invocation and parses the resulting HTML
+// report to produce per-crate child spans. Scoped to cargo subcommands that
+// accept --timings (build, test); clippy, check, and custom runners may not
+// support it — the benign (nil, nil) return from ParseSpans handles those cases.
+type cargoAdapter struct{}
+
+// Name returns "cargo", the registry key and Trace.Source value for runs that
+// use this adapter.
+func (cargoAdapter) Name() string { return "cargo" }
+
+// timingsFlag is the stable-cargo flag that activates the HTML timing report.
+const timingsFlag = "--timings"
+
+// PrepareArgv appends --timings to argv if it is not already present, ensuring
+// the flag is injected exactly once. Idempotent: if the user already passed
+// --timings or --timings=<format>, no second copy is added.
+func (cargoAdapter) PrepareArgv(argv []string) []string {
+	for _, arg := range argv {
+		// Both bare --timings and --timings=html are accepted by cargo;
+		// treat any argument that equals or begins with "--timings" as already
+		// present so we don't inject a conflicting duplicate.
+		if arg == timingsFlag || strings.HasPrefix(arg, timingsFlag+"=") {
+			return argv
+		}
+	}
+	return append(argv, timingsFlag)
+}
+
+// timingReportPrefix is the prefix of the cargo stderr line that announces
+// where the --timings report was written (e.g. "Timing report saved to /…/cargo-timing-….html").
+const timingReportPrefix = "Timing report saved to "
+
+// ParseSpans scans bc.Stderr for the cargo timing report path, reads and parses
+// the HTML file, and returns one child span per compilation unit parented under
+// bc.RootID. Returns (nil, nil) when no timing report is announced — this covers
+// both failed builds that emitted no report and cargo subcommands that don't
+// support --timings — so the run degrades gracefully to the opaque root span
+// rather than failing.
+func (cargoAdapter) ParseSpans(ctx context.Context, bc BuildContext) ([]model.Span, error) {
+	// Scan stderr line by line for the report-path announcement. Cargo writes
+	// exactly one such line; we take the first match.
+	path := findTimingReportPath(bc.Stderr)
+	if path == "" {
+		// No report announced — benign (failed build, unsupported subcommand).
+		return nil, nil
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		// Report announced but unreadable (e.g. build aborted before flush);
+		// degrade to root-only rather than erroring the whole run.
+		return nil, nil
+	}
+
+	units, err := parseUnits(data)
+	if err != nil {
+		return nil, fmt.Errorf("cargo adapter: parse timing report %q: %w", path, err)
+	}
+
+	return unitsToSpans(units, bc.RootID, bc.TraceID, bc.StartNs, bc.NewSpanID), nil
+}
+
+// findTimingReportPath searches the captured stderr bytes line by line for the
+// cargo announcement "Timing report saved to <path>" and returns the path.
+// Returns "" when no such line is found.
+func findTimingReportPath(stderr []byte) string {
+	for _, line := range strings.Split(string(stderr), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, timingReportPrefix) {
+			return strings.TrimPrefix(line, timingReportPrefix)
+		}
+	}
+	return ""
 }

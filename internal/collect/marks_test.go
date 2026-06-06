@@ -220,7 +220,7 @@ func TestRun_CollectsMarksOverSocket(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = st.Close() })
 
-	id, err := Run(ctx, st, []string{script})
+	id, err := Run(ctx, st, []string{script}, nil)
 	require.NoError(t, err)
 
 	tr, err := st.GetTrace(ctx, id)

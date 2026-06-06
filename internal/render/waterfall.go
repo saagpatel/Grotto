@@ -27,6 +27,11 @@ func WriteWaterfall(w io.Writer, tr model.Trace) error {
 	// unchanged. Threshold of one timeline character keeps invisible gaps out.
 	rootDur := root.Span.EndedNs - root.Span.StartedNs
 	InsertGaps(root, GapMinNs(rootDur, DefaultWidth))
+	// Collapse long-tail children (e.g. hundreds of parallel crate builds) into
+	// a single bucket row so the waterfall stays legible. Gaps are inserted
+	// first — on the real span set — so their timing calculations are correct
+	// and unaffected by the row reduction that follows.
+	RollupExcess(root, DefaultMaxRows)
 	bars := Layout(root, DefaultWidth)
 
 	nameCol := 0
