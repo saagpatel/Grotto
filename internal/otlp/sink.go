@@ -21,6 +21,7 @@ type Sink struct {
 	done   chan struct{}
 	wg     sync.WaitGroup
 	st     traceStore
+	out    io.Writer
 	errOut io.Writer
 }
 
@@ -29,12 +30,16 @@ type traceStore interface {
 	InsertTrace(ctx context.Context, t model.Trace) error
 }
 
-// NewSink starts the writer goroutine and returns a ready sink. Storage errors
-// are written to errOut (nil or io.Discard ignores them). Close must be called to
-// drain and stop the writer.
-func NewSink(st traceStore, bufSize int, errOut io.Writer) *Sink {
+// NewSink starts the writer goroutine and returns a ready sink. Each stored
+// trace is announced on out; storage errors are written to errOut (nil or
+// io.Discard ignores either stream). Close must be called to drain and stop the
+// writer.
+func NewSink(st traceStore, bufSize int, out, errOut io.Writer) *Sink {
 	if bufSize <= 0 {
 		bufSize = DefaultBufferSize
+	}
+	if out == nil {
+		out = io.Discard
 	}
 	if errOut == nil {
 		errOut = io.Discard
@@ -43,6 +48,7 @@ func NewSink(st traceStore, bufSize int, errOut io.Writer) *Sink {
 		ch:     make(chan model.Trace, bufSize),
 		done:   make(chan struct{}),
 		st:     st,
+		out:    out,
 		errOut: errOut,
 	}
 	s.wg.Add(1)
@@ -103,5 +109,11 @@ func (s *Sink) insert(tr model.Trace) {
 	// A fresh context: storage must complete even if an export's context is done.
 	if err := s.st.InsertTrace(context.Background(), tr); err != nil {
 		_, _ = fmt.Fprintf(s.errOut, "grotto: store trace %s: %v\n", tr.TraceID, err)
+		return
 	}
+	// Announce receipt so an interactive `grotto serve` confirms each export
+	// without the operator having to switch to `grotto list`. The full trace ID
+	// is printed so it can be pasted straight into `grotto show`.
+	_, _ = fmt.Fprintf(s.out, "grotto serve: received trace %s (%d spans, %s)\n",
+		tr.TraceID, tr.SpanCount, tr.RunLabel)
 }

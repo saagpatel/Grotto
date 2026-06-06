@@ -59,7 +59,7 @@ func TestWarnIfPublic(t *testing.T) {
 func TestGRPCExport_StoresTrace(t *testing.T) {
 	st := newStore(t)
 	var errs bytes.Buffer
-	sink := NewSink(st, 0, &errs)
+	sink := NewSink(st, 0, io.Discard, &errs)
 
 	grpcExport(t, sink, threeSpanRequest())
 	sink.Close()
@@ -74,7 +74,7 @@ func TestGRPCExport_StoresTrace(t *testing.T) {
 func TestHTTPExport_StoresTrace(t *testing.T) {
 	st := newStore(t)
 	var errs bytes.Buffer
-	sink := NewSink(st, 0, &errs)
+	sink := NewSink(st, 0, io.Discard, &errs)
 	srv := httptest.NewServer(newHTTPHandler(sink))
 	t.Cleanup(srv.Close)
 
@@ -98,14 +98,14 @@ func TestBothTransports_IdenticalTrees(t *testing.T) {
 	ctx := context.Background()
 
 	stG := newStore(t)
-	sinkG := NewSink(stG, 0, io.Discard)
+	sinkG := NewSink(stG, 0, io.Discard, io.Discard)
 	grpcExport(t, sinkG, threeSpanRequest())
 	sinkG.Close()
 	viaGRPC, err := stG.GetTrace(ctx, fxTraceIDHex)
 	require.NoError(t, err)
 
 	stH := newStore(t)
-	sinkH := NewSink(stH, 0, io.Discard)
+	sinkH := NewSink(stH, 0, io.Discard, io.Discard)
 	srv := httptest.NewServer(newHTTPHandler(sinkH))
 	t.Cleanup(srv.Close)
 	body, err := proto.Marshal(threeSpanRequest())
@@ -126,7 +126,7 @@ func TestExport_200Spans_NoLockErrors(t *testing.T) {
 	for run := 0; run < 10; run++ {
 		st := newStore(t)
 		var errs bytes.Buffer
-		sink := NewSink(st, 0, &errs)
+		sink := NewSink(st, 0, io.Discard, &errs)
 
 		sink.Submit(MapExportRequest(bigRequest(200)))
 		sink.Close()
@@ -152,7 +152,7 @@ func TestThreeSpanJSONFixture(t *testing.T) {
 	require.NoError(t, err)
 
 	st := newStore(t)
-	sink := NewSink(st, 0, io.Discard)
+	sink := NewSink(st, 0, io.Discard, io.Discard)
 	srv := httptest.NewServer(newHTTPHandler(sink))
 	t.Cleanup(srv.Close)
 

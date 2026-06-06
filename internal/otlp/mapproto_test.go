@@ -19,7 +19,7 @@ func TestMapExportRequest_ThreeSpans(t *testing.T) {
 	tr := traces[0]
 	assert.Equal(t, "otlp", tr.Source)
 	assert.Equal(t, fxTraceIDHex, tr.TraceID)
-	assert.Equal(t, "build-svc", tr.RunLabel)
+	assert.Equal(t, "build-svc · build", tr.RunLabel, "label combines service.name and root span name to distinguish same-service traces")
 	assert.Equal(t, "build", tr.RootName)
 	assert.Equal(t, 3, tr.SpanCount)
 	assert.Equal(t, int64(0), tr.StartedNs, "min start across spans")
@@ -74,4 +74,23 @@ func TestMapAttribute_Types(t *testing.T) {
 
 func TestMapExportRequest_Empty(t *testing.T) {
 	assert.Empty(t, MapExportRequest(nil))
+}
+
+func TestBuildTrace_Label(t *testing.T) {
+	root := model.Span{SpanID: "r", Name: "POST /checkout", EndedNs: 10}
+	tests := []struct {
+		name  string
+		label string // the service.name passed in
+		want  string
+	}{
+		{"service and root combine", "checkout-api", "checkout-api · POST /checkout"},
+		{"no service falls back to root name", "", "POST /checkout"},
+		{"service equal to root is not doubled", "POST /checkout", "POST /checkout"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr := buildTrace("tid", []model.Span{root}, tt.label)
+			assert.Equal(t, tt.want, tr.RunLabel)
+		})
+	}
 }

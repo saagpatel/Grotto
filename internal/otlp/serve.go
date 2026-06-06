@@ -36,7 +36,7 @@ func Serve(ctx context.Context, st *store.Store, cfg Config) error {
 		cfg.ErrOut = io.Discard
 	}
 
-	sink := NewSink(st, cfg.BufSize, cfg.ErrOut)
+	sink := NewSink(st, cfg.BufSize, cfg.Out, cfg.ErrOut)
 	defer sink.Close() // runs last: after both servers have stopped
 
 	grpcLn, err := net.Listen("tcp", cfg.GRPCAddr)
