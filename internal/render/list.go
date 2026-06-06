@@ -9,6 +9,10 @@ import (
 	"github.com/saagpatel/grotto/internal/store"
 )
 
+// labelColWidth caps the LABEL column so a long (often multi-line) run command
+// collapses to a single scannable cell instead of wrapping the table.
+const labelColWidth = 40
+
 // WriteTraceList renders trace summaries as a newest-first table to w. The trace
 // ID leads each row because it is the key passed to `grotto show` / `grotto diff`.
 // now is the reference time for the age column (injected for testability). An
@@ -25,7 +29,7 @@ func WriteTraceList(w io.Writer, rows []store.TraceSummary, now time.Time) error
 	for _, r := range rows {
 		fmt.Fprintf(&sb, "%-34s  %6d  %10s  %-5s  %-12s  %s\n",
 			r.TraceID, r.SpanCount, FormatDuration(r.DurationNs),
-			r.Source, HumanAge(r.CreatedAt, now), r.RunLabel)
+			r.Source, HumanAge(r.CreatedAt, now), CleanLabel(r.RunLabel, labelColWidth))
 	}
 
 	_, err := io.WriteString(w, sb.String())

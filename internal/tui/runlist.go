@@ -101,7 +101,7 @@ func (m runListModel) View() string {
 	}
 	for i, r := range m.rows {
 		line := fmt.Sprintf("  %-28s %6d  %10s  %-5s  %s",
-			truncate(r.RunLabel, 28), r.SpanCount,
+			render.CleanLabel(r.RunLabel, 28), r.SpanCount,
 			render.FormatDuration(r.DurationNs), truncate(r.Source, 5),
 			render.HumanAge(r.CreatedAt, now))
 		if i == m.cursor {

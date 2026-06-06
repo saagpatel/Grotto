@@ -106,7 +106,9 @@ func Diff(a, b model.Trace) []SpanDelta {
 // show "A → B  ±delta"; added/removed spans are prefixed with + / −.
 func WriteDiff(w io.Writer, a, b model.Trace, deltas []SpanDelta) error {
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "diff  %s → %s\n", a.RunLabel, b.RunLabel)
+	fmt.Fprintf(&sb, "diff  %s %s → %s %s\n",
+		shortTraceID(a.TraceID), CleanLabel(a.RunLabel, labelColWidth),
+		shortTraceID(b.TraceID), CleanLabel(b.RunLabel, labelColWidth))
 	fmt.Fprintf(&sb, "total %s → %s  (%s)\n\n",
 		FormatDuration(a.DurationNs), FormatDuration(b.DurationNs),
 		signedDuration(b.DurationNs-a.DurationNs))
@@ -126,6 +128,17 @@ func WriteDiff(w io.Writer, a, b model.Trace, deltas []SpanDelta) error {
 
 	_, err := io.WriteString(w, sb.String())
 	return err
+}
+
+// shortTraceID returns the leading 8 hex chars of a trace ID — enough to keep
+// two traces distinguishable in the diff header (whose labels are truncated and
+// may share a long prefix) without printing the full 32-char key.
+func shortTraceID(id string) string {
+	const n = 8
+	if len(id) <= n {
+		return id
+	}
+	return id[:n]
 }
 
 // signedDuration formats a nanosecond delta with an explicit sign; zero renders
