@@ -133,3 +133,43 @@ func TestUnitDisplayName_Disambiguation(t *testing.T) {
 		}
 	}
 }
+
+// TestFindTimingReportPath covers the plain line, an ANSI-colored line (cargo
+// under CLICOLOR_FORCE), and the absent case.
+func TestFindTimingReportPath(t *testing.T) {
+	cases := []struct {
+		name   string
+		stderr string
+		want   string
+	}{
+		{"plain", "   Compiling x\nTiming report saved to /tmp/r.html\n", "/tmp/r.html"},
+		{"ansi-wrapped", "\x1b[1mTiming report saved to\x1b[0m /tmp/r.html\n", "/tmp/r.html"},
+		{"absent", "   Compiling x\n    Finished\n", ""},
+	}
+	for _, tc := range cases {
+		if got := findTimingReportPath([]byte(tc.stderr)); got != tc.want {
+			t.Errorf("%s: findTimingReportPath = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
+// TestUnitsToSpans_ClampsCorruptTiming verifies the defensive clamp: a unit with
+// a negative start (which would precede the root) and a negative duration (which
+// would invert the interval) is clamped so the span neither precedes startNs nor
+// ends before it begins.
+func TestUnitsToSpans_ClampsCorruptTiming(t *testing.T) {
+	const startNs = int64(1_000_000_000_000)
+	units := []unit{{Name: "bad", Version: "0.0.0", Start: -0.5, Duration: -1.0}}
+
+	spans := unitsToSpans(units, "rootid", "traceid", startNs, func() string { return "s1" })
+	if len(spans) != 1 {
+		t.Fatalf("got %d spans, want 1", len(spans))
+	}
+	s := spans[0]
+	if s.StartedNs < startNs {
+		t.Errorf("StartedNs %d must not precede startNs %d", s.StartedNs, startNs)
+	}
+	if s.EndedNs < s.StartedNs || s.DurationNs < 0 {
+		t.Errorf("interval must not be inverted: start=%d end=%d dur=%d", s.StartedNs, s.EndedNs, s.DurationNs)
+	}
+}

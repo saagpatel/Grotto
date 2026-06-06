@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/saagpatel/grotto/internal/model"
@@ -125,7 +126,18 @@ func unitsToSpans(units []unit, rootID, traceID string, startNs int64, newSpanID
 	spans := make([]model.Span, 0, len(units))
 	for _, u := range units {
 		started := startNs + int64(u.Start*1e9)
+		// Clamp defensively, mirroring assembleTrace: a unit can never start
+		// before the command's own start, and a span cannot end before it begins.
+		// Real cargo output satisfies both, but a corrupt report must not produce
+		// a span that precedes the root or has a negative duration (which would
+		// then poison gap math and the rollup bucket's summed time).
+		if started < startNs {
+			started = startNs
+		}
 		ended := started + int64(u.Duration*1e9)
+		if ended < started {
+			ended = started
+		}
 		spans = append(spans, model.Span{
 			SpanID:       newSpanID(),
 			TraceID:      traceID,
@@ -204,14 +216,20 @@ func (cargoAdapter) ParseSpans(ctx context.Context, bc BuildContext) ([]model.Sp
 	return unitsToSpans(units, bc.RootID, bc.TraceID, bc.StartNs, bc.NewSpanID), nil
 }
 
-// findTimingReportPath searches the captured stderr bytes line by line for the
-// cargo announcement "Timing report saved to <path>" and returns the path.
-// Returns "" when no such line is found.
+// ansiSGR matches ANSI SGR (color/style) escape sequences. Cargo emits them on
+// stderr when color is forced (e.g. CLICOLOR_FORCE=1 in CI), which would
+// otherwise hide the timing-report marker from a plain text match.
+var ansiSGR = regexp.MustCompile("\x1b\\[[0-9;]*m")
+
+// findTimingReportPath searches the captured stderr for cargo's announcement
+// "Timing report saved to <path>" and returns the path, or "" when absent. It
+// strips ANSI styling and matches the marker as a substring (not a strict
+// prefix) so a color-forced or otherwise-decorated line still resolves.
 func findTimingReportPath(stderr []byte) string {
 	for _, line := range strings.Split(string(stderr), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, timingReportPrefix) {
-			return strings.TrimPrefix(line, timingReportPrefix)
+		line = ansiSGR.ReplaceAllString(line, "")
+		if i := strings.Index(line, timingReportPrefix); i >= 0 {
+			return strings.TrimSpace(line[i+len(timingReportPrefix):])
 		}
 	}
 	return ""

@@ -113,6 +113,39 @@ func TestRun_AdapterGraftsSpans(t *testing.T) {
 	assert.True(t, names["crate-b"], "crate-b span must be in the trace")
 }
 
+// errAdapter is an Adapter whose ParseSpans always fails, modeling a malformed or
+// truncated timing report.
+type errAdapter struct{}
+
+func (errAdapter) Name() string                       { return "errstub" }
+func (errAdapter) PrepareArgv(argv []string) []string { return argv }
+func (errAdapter) ParseSpans(_ context.Context, _ adapter.BuildContext) ([]model.Span, error) {
+	return nil, assert.AnError
+}
+
+// TestRun_AdapterParseErrorStillStoresTrace verifies that an adapter parse
+// failure does not discard the already-captured trace: the command ran, so its
+// root/marks trace must still be stored (the per-unit spans are an enrichment,
+// not the capture). Regression guard for the "error nukes the whole trace" bug.
+func TestRun_AdapterParseErrorStillStoresTrace(t *testing.T) {
+	if testing.Short() {
+		t.Skip("spawns a subprocess")
+	}
+
+	ctx := context.Background()
+
+	st, err := store.Open(ctx, filepath.Join(t.TempDir(), "grotto.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = st.Close() })
+
+	id, err := Run(ctx, st, []string{"sh", "-c", "true"}, errAdapter{})
+	require.NoError(t, err, "a failed adapter parse must not fail the run")
+
+	tr, err := st.GetTrace(ctx, id)
+	require.NoError(t, err)
+	assert.Equal(t, 1, tr.SpanCount, "base trace (root only) must survive an adapter parse failure")
+}
+
 // TestRun_NilAdapterUnchanged verifies that passing nil for the adapter leaves
 // the trace exactly as today: only the root span (plus any marks, here zero).
 func TestRun_NilAdapterUnchanged(t *testing.T) {

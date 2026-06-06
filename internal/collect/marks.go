@@ -147,11 +147,12 @@ func Run(ctx context.Context, st *store.Store, argv []string, ad adapter.Adapter
 		}
 		adSpans, parseErr := ad.ParseSpans(context.WithoutCancel(ctx), bc)
 		if parseErr != nil {
-			// A real parse failure (not the benign missing-report nil,nil) is
-			// worth surfacing so the user knows the per-unit waterfall is absent.
-			return "", fmt.Errorf("adapter %q parse: %w", ad.Name(), parseErr)
-		}
-		if len(adSpans) > 0 {
+			// The per-unit spans are an enrichment, not the capture itself: the
+			// command already ran and its root/marks trace is assembled. A failure
+			// to parse the timing report must not discard that trace, so warn and
+			// fall through to store the base trace rather than returning an error.
+			fmt.Fprintf(os.Stderr, "grotto: adapter %q: %v (storing trace without per-unit spans)\n", ad.Name(), parseErr)
+		} else if len(adSpans) > 0 {
 			tr.Spans = append(tr.Spans, adSpans...)
 			tr.SpanCount = len(tr.Spans)
 			tr.Source = ad.Name()
