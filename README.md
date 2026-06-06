@@ -155,6 +155,25 @@ total 3.66s → 39ms  (-3.62s)
 
 `--sort=delta` puts the biggest movers first (default is structural tree order). A crate that got *slower* between runs shows a `+` delta — handy for catching a dependency bump that regressed compile time.
 
+#### Find the build's floor: the critical path
+
+A waterfall shows *where* time went; the critical path shows the *one chain you'd have to shorten to make the build faster*. The cargo adapter records each crate's dependency edges (which units it unblocks), so `grotto show --critical-path` walks the longest-duration chain through that DAG — the sequence that sets the build's minimum time even with unlimited parallelism:
+
+```bash
+grotto show <trace-id> --critical-path
+```
+
+```
+critical path  1.82s  (the build's floor)
+6.78s total compile work · 2.97s wall-clock · 24 units, 4 on the path
+  syn v2.0.117          ██████████████  670ms
+  serde_derive v1.0.228 ██████████████████  850ms
+  serde v1.0.228        ████  220ms
+  critme v0.1.0         █  80ms
+```
+
+Read it as a story: 6.78s of compile *work* ran in 2.97s of wall-clock thanks to parallelism, but it can't drop below **1.82s** because `serde_derive` (a proc-macro) can't compile until `syn` finishes, and `serde` can't expand its derives until `serde_derive` finishes. Throwing more cores at this build won't help — shortening that chain (or the proc-macro) will. (Only `--adapter=cargo` traces carry dependency edges; the flag degrades with a clear message on other traces.)
+
 ### Receive OTLP spans from an instrumented app
 
 ```bash

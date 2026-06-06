@@ -134,6 +134,27 @@ func TestUnitDisplayName_Disambiguation(t *testing.T) {
 	}
 }
 
+// TestUnitDAGAttrs verifies the DAG edges are stamped as span attributes:
+// cargo.unit always, cargo.unblocks only when the unit has outgoing edges.
+func TestUnitDAGAttrs(t *testing.T) {
+	withEdges := unit{Index: 5, UnblockedUnits: []int{6, 7, 12}}.dagAttrs()
+	got := map[string]string{}
+	for _, a := range withEdges {
+		got[a.Key] = a.Value
+	}
+	if got["cargo.unit"] != "5" {
+		t.Errorf("cargo.unit = %q, want 5", got["cargo.unit"])
+	}
+	if got["cargo.unblocks"] != "6,7,12" {
+		t.Errorf("cargo.unblocks = %q, want 6,7,12", got["cargo.unblocks"])
+	}
+
+	noEdges := unit{Index: 3}.dagAttrs()
+	if len(noEdges) != 1 || noEdges[0].Key != "cargo.unit" {
+		t.Errorf("a unit with no edges must carry only cargo.unit, got %v", noEdges)
+	}
+}
+
 // TestFindTimingReportPath covers the plain line, an ANSI-colored line (cargo
 // under CLICOLOR_FORCE), and the absent case.
 func TestFindTimingReportPath(t *testing.T) {

@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/saagpatel/grotto/internal/model"
@@ -25,9 +26,7 @@ const unitDataMarker = "const UNIT_DATA = "
 
 // unit is one compilation unit from a cargo --timings report: one crate built in
 // one mode. start and duration are seconds relative to the build's internal
-// start, at 2-decimal (10ms) precision. Fields beyond these (sections,
-// unblocked_units) are ignored here and reserved for v1.5 sub-nesting and
-// critical-path work.
+// start, at 2-decimal (10ms) precision.
 type unit struct {
 	Index    int     `json:"i"`
 	Name     string  `json:"name"`
@@ -40,6 +39,11 @@ type unit struct {
 	// is also used by a host-side proc-macro can appear three times — Target is
 	// what tells them apart in the waterfall.
 	Target string `json:"target"`
+	// UnblockedUnits lists the indices of units that this unit unblocks when it
+	// finishes compiling — the forward edges of the build's dependency DAG. They
+	// are stamped onto each span as attributes so the critical-path analysis can
+	// reconstruct the graph from a stored trace.
+	UnblockedUnits []int `json:"unblocked_units"`
 }
 
 // displayName is the span name for a unit: "<crate> v<version>", suffixed with
@@ -148,9 +152,31 @@ func unitsToSpans(units []unit, rootID, traceID string, startNs int64, newSpanID
 			StartedNs:    started,
 			EndedNs:      ended,
 			DurationNs:   ended - started,
+			Attributes:   u.dagAttrs(),
 		})
 	}
 	return spans
+}
+
+// dagAttrs stamps the unit's place in the build dependency DAG onto its span:
+// cargo.unit is this unit's index, and cargo.unblocks (present only when there
+// are edges) is the comma-separated list of unit indices this one unblocks. The
+// critical-path analysis reconstructs the graph from these attributes, so the
+// edges survive the trip through SQLite as ordinary OTel span attributes.
+func (u unit) dagAttrs() []model.Attribute {
+	attrs := []model.Attribute{
+		{Key: "cargo.unit", ValueType: "int", Value: strconv.Itoa(u.Index)},
+	}
+	if len(u.UnblockedUnits) > 0 {
+		ids := make([]string, len(u.UnblockedUnits))
+		for i, idx := range u.UnblockedUnits {
+			ids[i] = strconv.Itoa(idx)
+		}
+		attrs = append(attrs, model.Attribute{
+			Key: "cargo.unblocks", ValueType: "str", Value: strings.Join(ids, ","),
+		})
+	}
+	return attrs
 }
 
 // cargoAdapter implements Adapter for `cargo build` and `cargo test` runs.
