@@ -3,6 +3,7 @@ package render
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	"github.com/saagpatel/grotto/internal/model"
@@ -99,6 +100,34 @@ func Diff(a, b model.Trace) []SpanDelta {
 		}
 	}
 	return out
+}
+
+// deltaImpact is the magnitude of a span's change, used to rank deltas by how
+// much they moved: the absolute duration delta for a matched span, or the full
+// present-side duration for a span that appeared (added) or vanished (removed).
+func deltaImpact(d SpanDelta) int64 {
+	switch d.Kind {
+	case DeltaAdded:
+		return d.BNs
+	case DeltaRemoved:
+		return d.ANs
+	default:
+		if d.DeltaNs < 0 {
+			return -d.DeltaNs
+		}
+		return d.DeltaNs
+	}
+}
+
+// SortByImpact reorders deltas in place by descending change magnitude, so the
+// biggest movers surface first — e.g. the crates a warm cache saved the most
+// time on. The sort is stable, so equal-impact spans keep their structural
+// (pre-order) relationship. This trades the parent/child indentation reading for
+// impact ranking, which is why it is opt-in (`grotto diff --sort=delta`).
+func SortByImpact(deltas []SpanDelta) {
+	sort.SliceStable(deltas, func(i, j int) bool {
+		return deltaImpact(deltas[i]) > deltaImpact(deltas[j])
+	})
 }
 
 // WriteDiff renders a comparison of traces a and b to w: a header with the

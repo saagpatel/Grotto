@@ -134,6 +134,27 @@ grotto show <trace-id> --json       # full per-crate data, uncollapsed
 
 The interactive TUI (`grotto tui`) never collapses — you can scroll and inspect every crate. Adapters are pluggable; `cargo` is the first.
 
+#### See what the cache saved: diff a cold build against a warm one
+
+Because every crate is a stored span, `grotto diff` gives you a per-crate cache delta for free. Capture a cold build and a warm rebuild, then diff them with `--sort=delta` to rank crates by how much the cache saved:
+
+```bash
+grotto run --adapter=cargo -- cargo build   # cold
+grotto run --adapter=cargo -- cargo build   # warm (cached)
+grotto diff <cold-id> <warm-id> --sort=delta
+```
+
+```
+total 3.66s → 39ms  (-3.62s)
+  cargo                       3.66s → 39ms  -3.62s
+    serde_core v1.0.228        970ms → 0ns  -970ms
+    serde_derive v1.0.228      960ms → 0ns  -960ms
+    syn v2.0.117               740ms → 0ns  -740ms
+    serde_json v1.0.150        490ms → 0ns  -490ms
+```
+
+`--sort=delta` puts the biggest movers first (default is structural tree order). A crate that got *slower* between runs shows a `+` delta — handy for catching a dependency bump that regressed compile time.
+
 ### Receive OTLP spans from an instrumented app
 
 ```bash
