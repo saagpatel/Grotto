@@ -38,6 +38,10 @@ type BuildContext struct {
 	// the adapter's CapturesStdout reports true (used by the go-test adapter,
 	// whose -json event stream is written to stdout).
 	Stdout []byte
+	// ScratchDir is the per-run temporary directory grotto owns (the same one
+	// passed to PrepareArgv). An adapter that injected a report path inside it
+	// reads the report back from here. Auto-removed when the run ends.
+	ScratchDir string
 	// NewSpanID is a factory func for fresh span IDs, injected by the caller
 	// (collect.newSpanID) so that ID generation stays centralized and tests can
 	// supply a deterministic counter.
@@ -53,11 +57,15 @@ type Adapter interface {
 	// adapter is active (e.g. "cargo").
 	Name() string
 
-	// PrepareArgv injects any flags the tool needs (e.g. --timings for cargo)
-	// into argv and returns the resulting slice. The implementation must be
-	// idempotent — if the user already supplied the required flag, it must not
-	// be added a second time.
-	PrepareArgv(argv []string) []string
+	// PrepareArgv injects any flags the tool needs (e.g. --timings for cargo,
+	// --junitxml for junit) into argv and returns the resulting slice. scratchDir
+	// is a per-run temporary directory grotto owns (auto-removed when the run ends);
+	// an adapter that must tell its tool where to write a report points it inside
+	// scratchDir and reads the same path back in ParseSpans via bc.ScratchDir.
+	// Adapters that don't need a scratch path ignore the argument. The
+	// implementation must be idempotent — if the user already supplied the required
+	// flag, it must not be added a second time.
+	PrepareArgv(argv []string, scratchDir string) []string
 
 	// CapturesStdout reports whether the adapter consumes the child's stdout as
 	// its data source. When true, Run captures stdout into BuildContext.Stdout
@@ -123,6 +131,7 @@ type StreamParser interface {
 var adapters = map[string]Adapter{
 	"cargo":   cargoAdapter{},
 	"go-test": goTestAdapter{},
+	"junit":   junitAdapter{},
 }
 
 // Names returns the registered adapter names in sorted order, for help text and

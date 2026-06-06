@@ -73,16 +73,18 @@ func Run(ctx context.Context, st *store.Store, argv []string, ad adapter.Adapter
 		return "", errors.New("no command given")
 	}
 
-	// Let the adapter prepend/append any flags it needs before we build the Cmd.
-	if ad != nil {
-		argv = ad.PrepareArgv(argv)
-	}
-
 	dir, err := os.MkdirTemp("", "grotto-run-")
 	if err != nil {
 		return "", fmt.Errorf("create run dir: %w", err)
 	}
 	defer func() { _ = os.RemoveAll(dir) }()
+
+	// Let the adapter prepend/append any flags it needs before we build the Cmd.
+	// dir is the per-run scratch dir: an adapter that writes a report (junit) points
+	// its tool there via PrepareArgv and reads it back from bc.ScratchDir.
+	if ad != nil {
+		argv = ad.PrepareArgv(argv, dir)
+	}
 
 	sockPath := filepath.Join(dir, "sock")
 	spoolPath := filepath.Join(dir, "spool.jsonl")
@@ -177,13 +179,14 @@ func Run(ctx context.Context, st *store.Store, argv []string, ad adapter.Adapter
 		graftSpans(&tr, stream.Finalize(endNs), ad.Name())
 	case ad != nil:
 		bc := adapter.BuildContext{
-			RootID:    rootID,
-			TraceID:   traceID,
-			StartNs:   startNs,
-			EndNs:     endNs,
-			Stderr:    stderrBuf.Bytes(),
-			Stdout:    stdoutBuf.Bytes(),
-			NewSpanID: newSpanID,
+			RootID:     rootID,
+			TraceID:    traceID,
+			StartNs:    startNs,
+			EndNs:      endNs,
+			Stderr:     stderrBuf.Bytes(),
+			Stdout:     stdoutBuf.Bytes(),
+			ScratchDir: dir,
+			NewSpanID:  newSpanID,
 		}
 		adSpans, parseErr := ad.ParseSpans(context.WithoutCancel(ctx), bc)
 		if parseErr != nil {
