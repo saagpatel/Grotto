@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/saagpatel/grotto/internal/model"
@@ -25,9 +26,7 @@ const unitDataMarker = "const UNIT_DATA = "
 
 // unit is one compilation unit from a cargo --timings report: one crate built in
 // one mode. start and duration are seconds relative to the build's internal
-// start, at 2-decimal (10ms) precision. Fields beyond these (sections,
-// unblocked_units) are ignored here and reserved for v1.5 sub-nesting and
-// critical-path work.
+// start, at 2-decimal (10ms) precision.
 type unit struct {
 	Index    int     `json:"i"`
 	Name     string  `json:"name"`
@@ -40,6 +39,52 @@ type unit struct {
 	// is also used by a host-side proc-macro can appear three times — Target is
 	// what tells them apart in the waterfall.
 	Target string `json:"target"`
+	// UnblockedUnits lists the indices of units that this unit unblocks when it
+	// finishes compiling — the forward edges of the build's dependency DAG. They
+	// are stamped onto each span as attributes so the critical-path analysis can
+	// reconstruct the graph from a stored trace.
+	UnblockedUnits []int `json:"unblocked_units"`
+	// Sections are the unit's compile sub-phases (frontend = parse/typecheck/
+	// borrow-check, codegen = LLVM codegen/optimization), with times relative to
+	// the unit's own start. Null for units that do not split (build scripts,
+	// their runs, some proc-macros and binaries).
+	Sections []section `json:"sections"`
+}
+
+// AttrSection marks a span as a cargo compile sub-phase (frontend/codegen). The
+// `grotto show` waterfall hides these by default and reveals them with
+// --sections; critical-path and rollup ignore them via this marker.
+const AttrSection = "cargo.section"
+
+// section is one compile sub-phase of a unit. Cargo encodes it as a 2-tuple
+// [name, {start,end}], with start/end in seconds relative to the unit's start.
+type section struct {
+	Name  string
+	Start float64
+	End   float64
+}
+
+// UnmarshalJSON decodes cargo's ["<name>", {"start":..,"end":..}] tuple shape.
+func (s *section) UnmarshalJSON(b []byte) error {
+	var raw []json.RawMessage
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	if len(raw) < 2 {
+		return fmt.Errorf("section: want [name, {start,end}], got %d elements", len(raw))
+	}
+	if err := json.Unmarshal(raw[0], &s.Name); err != nil {
+		return fmt.Errorf("section name: %w", err)
+	}
+	var span struct {
+		Start float64 `json:"start"`
+		End   float64 `json:"end"`
+	}
+	if err := json.Unmarshal(raw[1], &span); err != nil {
+		return fmt.Errorf("section span: %w", err)
+	}
+	s.Start, s.End = span.Start, span.End
+	return nil
 }
 
 // displayName is the span name for a unit: "<crate> v<version>", suffixed with
@@ -138,8 +183,9 @@ func unitsToSpans(units []unit, rootID, traceID string, startNs int64, newSpanID
 		if ended < started {
 			ended = started
 		}
+		crateID := newSpanID()
 		spans = append(spans, model.Span{
-			SpanID:       newSpanID(),
+			SpanID:       crateID,
 			TraceID:      traceID,
 			ParentSpanID: rootID,
 			Name:         u.displayName(),
@@ -148,9 +194,66 @@ func unitsToSpans(units []unit, rootID, traceID string, startNs int64, newSpanID
 			StartedNs:    started,
 			EndedNs:      ended,
 			DurationNs:   ended - started,
+			Attributes:   u.dagAttrs(),
 		})
+
+		// Sub-phase children (frontend/codegen), parented to this crate. Their
+		// cargo times are relative to the unit's start; clamp inside the crate's
+		// interval so a corrupt report cannot push a sub-phase outside its parent.
+		for _, sec := range u.Sections {
+			ss := started + int64(sec.Start*1e9)
+			se := started + int64(sec.End*1e9)
+			// Keep the sub-phase inside its crate's interval even if the report is
+			// corrupt: clamp the start up to `started` and down to `ended` before
+			// clamping the end, so a section can never begin or end outside the crate.
+			if ss < started {
+				ss = started
+			}
+			if ss > ended {
+				ss = ended
+			}
+			if se > ended {
+				se = ended
+			}
+			if se < ss {
+				se = ss
+			}
+			spans = append(spans, model.Span{
+				SpanID:       newSpanID(),
+				TraceID:      traceID,
+				ParentSpanID: crateID,
+				Name:         sec.Name,
+				Kind:         model.KindInternal,
+				Status:       model.StatusOk,
+				StartedNs:    ss,
+				EndedNs:      se,
+				DurationNs:   se - ss,
+				Attributes:   []model.Attribute{{Key: AttrSection, ValueType: "str", Value: sec.Name}},
+			})
+		}
 	}
 	return spans
+}
+
+// dagAttrs stamps the unit's place in the build dependency DAG onto its span:
+// cargo.unit is this unit's index, and cargo.unblocks (present only when there
+// are edges) is the comma-separated list of unit indices this one unblocks. The
+// critical-path analysis reconstructs the graph from these attributes, so the
+// edges survive the trip through SQLite as ordinary OTel span attributes.
+func (u unit) dagAttrs() []model.Attribute {
+	attrs := []model.Attribute{
+		{Key: "cargo.unit", ValueType: "int", Value: strconv.Itoa(u.Index)},
+	}
+	if len(u.UnblockedUnits) > 0 {
+		ids := make([]string, len(u.UnblockedUnits))
+		for i, idx := range u.UnblockedUnits {
+			ids[i] = strconv.Itoa(idx)
+		}
+		attrs = append(attrs, model.Attribute{
+			Key: "cargo.unblocks", ValueType: "str", Value: strings.Join(ids, ","),
+		})
+	}
+	return attrs
 }
 
 // cargoAdapter implements Adapter for `cargo build` and `cargo test` runs.

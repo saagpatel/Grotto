@@ -141,15 +141,15 @@ func TestCargoAdapter_ParseSpans_RealFixture(t *testing.T) {
 		t.Fatalf("ParseSpans: %v", err)
 	}
 
-	// The fixture contains exactly 4 compilation units.
-	const wantSpans = 4
-	if len(spans) != wantSpans {
-		t.Fatalf("got %d spans, want %d", len(spans), wantSpans)
-	}
-
+	// Separate crate spans (one per compilation unit, carrying cargo.unit) from
+	// their frontend/codegen sub-phase children (carrying cargo.section).
+	var crates, sub int
 	for i, s := range spans {
-		if s.ParentSpanID != bc.RootID {
-			t.Errorf("spans[%d].ParentSpanID = %q, want %q", i, s.ParentSpanID, bc.RootID)
+		isSection := false
+		for _, a := range s.Attributes {
+			if a.Key == AttrSection {
+				isSection = true
+			}
 		}
 		if s.TraceID != bc.TraceID {
 			t.Errorf("spans[%d].TraceID = %q, want %q", i, s.TraceID, bc.TraceID)
@@ -157,5 +157,24 @@ func TestCargoAdapter_ParseSpans_RealFixture(t *testing.T) {
 		if s.StartedNs < bc.StartNs {
 			t.Errorf("spans[%d].StartedNs %d < StartNs %d (anchor violation)", i, s.StartedNs, bc.StartNs)
 		}
+		if isSection {
+			sub++
+			if s.ParentSpanID == bc.RootID {
+				t.Errorf("section spans[%d] must parent to a crate, not the root", i)
+			}
+		} else {
+			crates++
+			if s.ParentSpanID != bc.RootID {
+				t.Errorf("crate spans[%d].ParentSpanID = %q, want root %q", i, s.ParentSpanID, bc.RootID)
+			}
+		}
+	}
+
+	// The fixture contains exactly 4 compilation units, each with sub-phases.
+	if crates != 4 {
+		t.Errorf("got %d crate spans, want 4", crates)
+	}
+	if sub == 0 {
+		t.Error("expected frontend/codegen sub-phase spans from the fixture, got none")
 	}
 }

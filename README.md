@@ -134,6 +134,65 @@ grotto show <trace-id> --json       # full per-crate data, uncollapsed
 
 The interactive TUI (`grotto tui`) never collapses — you can scroll and inspect every crate. Adapters are pluggable; `cargo` is the first.
 
+#### See what the cache saved: diff a cold build against a warm one
+
+Because every crate is a stored span, `grotto diff` gives you a per-crate cache delta for free. Capture a cold build and a warm rebuild, then diff them with `--sort=delta` to rank crates by how much the cache saved:
+
+```bash
+grotto run --adapter=cargo -- cargo build   # cold
+grotto run --adapter=cargo -- cargo build   # warm (cached)
+grotto diff <cold-id> <warm-id> --sort=delta
+```
+
+```
+total 3.66s → 39ms  (-3.62s)
+  cargo                       3.66s → 39ms  -3.62s
+    serde_core v1.0.228        970ms → 0ns  -970ms
+    serde_derive v1.0.228      960ms → 0ns  -960ms
+    syn v2.0.117               740ms → 0ns  -740ms
+    serde_json v1.0.150        490ms → 0ns  -490ms
+```
+
+`--sort=delta` puts the biggest movers first (default is structural tree order). A crate that got *slower* between runs shows a `+` delta — handy for catching a dependency bump that regressed compile time.
+
+#### Find the build's floor: the critical path
+
+A waterfall shows *where* time went; the critical path shows the *one chain you'd have to shorten to make the build faster*. The cargo adapter records each crate's dependency edges (which units it unblocks), so `grotto show --critical-path` walks the longest-duration chain through that DAG — the sequence that sets the build's minimum time even with unlimited parallelism:
+
+```bash
+grotto show <trace-id> --critical-path
+```
+
+```
+critical path  1.82s  (the build's floor)
+6.78s total compile work · 2.97s wall-clock · 24 units, 4 on the path
+  syn v2.0.117          ██████████████  670ms
+  serde_derive v1.0.228 ██████████████████  850ms
+  serde v1.0.228        ████  220ms
+  critme v0.1.0         █  80ms
+```
+
+Read it as a story: 6.78s of compile *work* ran in 2.97s of wall-clock thanks to parallelism, but it can't drop below **1.82s** because `serde_derive` (a proc-macro) can't compile until `syn` finishes, and `serde` can't expand its derives until `serde_derive` finishes. Throwing more cores at this build won't help — shortening that chain (or the proc-macro) will. (Only `--adapter=cargo` traces carry dependency edges; the flag degrades with a clear message on other traces.)
+
+#### Frontend vs codegen: why a crate is slow
+
+cargo splits each crate's compile into a *frontend* phase (parse, type-check, borrow-check, macro expansion) and a *codegen* phase (LLVM codegen + optimization). Grotto stores both as sub-spans; `grotto show --sections` nests them under each crate:
+
+```bash
+grotto show <trace-id> --sections
+```
+
+```
+  serde_core v1.0.228   █████████████  940ms
+    frontend            ████████████  880ms
+    codegen             █  60ms
+  syn v2.0.117          █████████  690ms
+    frontend            ████████  600ms
+    codegen             █  90ms
+```
+
+`serde_core` spends 94% of its time in the frontend — it's trait/generics-bound, so codegen optimization flags won't help it; a codegen-heavy crate is the opposite. The sub-phases are stored on every cargo trace (visible in `--json` and the interactive TUI) but hidden from the default waterfall to keep it uncluttered.
+
 ### Receive OTLP spans from an instrumented app
 
 ```bash

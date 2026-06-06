@@ -114,3 +114,21 @@ func TestSignedDuration(t *testing.T) {
 	assert.Equal(t, "-90ms", signedDuration(-90*ms))
 	assert.Equal(t, "0", signedDuration(0))
 }
+
+// TestSortByImpact verifies that deltas reorder by descending change magnitude:
+// a big cache saving (matched, large negative delta) outranks a small one, and
+// added/removed spans rank by their full present-side duration. Stable order
+// preserves structural sequence among equal-impact spans.
+func TestSortByImpact(t *testing.T) {
+	deltas := []SpanDelta{
+		{Name: "small-save", Kind: DeltaMatched, ANs: 100 * ms, BNs: 90 * ms, DeltaNs: -10 * ms},
+		{Name: "big-save", Kind: DeltaMatched, ANs: 970 * ms, BNs: 0, DeltaNs: -970 * ms},
+		{Name: "appeared", Kind: DeltaAdded, BNs: 500 * ms},
+		{Name: "vanished", Kind: DeltaRemoved, ANs: 300 * ms},
+	}
+	SortByImpact(deltas)
+
+	got := []string{deltas[0].Name, deltas[1].Name, deltas[2].Name, deltas[3].Name}
+	want := []string{"big-save", "appeared", "vanished", "small-save"} // 970 > 500 > 300 > 10
+	assert.Equal(t, want, got)
+}
