@@ -66,18 +66,36 @@ func newWaterfallModel(tr model.Trace, w, h int) waterfallModel {
 	if h <= 0 {
 		h = 24
 	}
+	tree := model.AssembleTree(tr.Spans)
+	if tree != nil {
+		// Augment with synthetic gap rows so unaccounted time is visible (same
+		// transform as `grotto show`). Threshold off the widest layout so a gap
+		// that is ever visible is included; narrower widths floor it to 1 char.
+		rootDur := tree.Span.EndedNs - tree.Span.StartedNs
+		render.InsertGaps(tree, render.GapMinNs(rootDur, timelineMax))
+	}
 	m := waterfallModel{
 		trace:     tr,
-		tree:      model.AssembleTree(tr.Spans),
+		tree:      tree,
 		spanByID:  make(map[string]model.Span, len(tr.Spans)),
 		collapsed: make(map[string]bool),
 		width:     w,
 		height:    h,
 		vp:        viewport.New(w, max(1, h-waterfallChrome)),
 	}
-	for _, s := range tr.Spans {
-		m.spanByID[s.SpanID] = s
+	// Register every node — including synthetic gaps — so the inspector can
+	// resolve any selectable row by span ID.
+	var register func(n *model.TreeNode)
+	register = func(n *model.TreeNode) {
+		if n == nil {
+			return
+		}
+		m.spanByID[n.Span.SpanID] = n.Span
+		for _, c := range n.Children {
+			register(c)
+		}
 	}
+	register(tree)
 	m.recomputeGeometry()
 	m.recomputeVisible()
 	m.refresh()

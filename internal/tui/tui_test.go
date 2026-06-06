@@ -45,12 +45,16 @@ func keyMsg(s string) tea.KeyMsg {
 
 // fourSpanTrace is a small nested trace: root → {a → a1, b}. Pre-order by start
 // time is [root, a, a1, b].
+// fourSpanTrace is a gap-free fixture: children exactly tile their parents
+// (a + b cover the root; a1 covers a), so generic navigation/collapse/inspector
+// tests see no synthetic gap rows. Gap insertion is exercised separately by the
+// render package's InsertGaps tests.
 func fourSpanTrace() model.Trace {
 	spans := []model.Span{
 		{SpanID: "root", Name: "root", StartedNs: 0, EndedNs: 100, DurationNs: 100, Kind: model.KindInternal, Status: model.StatusOk},
-		{SpanID: "a", ParentSpanID: "root", Name: "a", StartedNs: 10, EndedNs: 50, DurationNs: 40, Kind: model.KindClient, Status: model.StatusOk},
-		{SpanID: "a1", ParentSpanID: "a", Name: "a1", StartedNs: 20, EndedNs: 40, DurationNs: 20, Kind: model.KindInternal, Status: model.StatusError},
-		{SpanID: "b", ParentSpanID: "root", Name: "b", StartedNs: 60, EndedNs: 90, DurationNs: 30, Kind: model.KindInternal, Status: model.StatusOk},
+		{SpanID: "a", ParentSpanID: "root", Name: "a", StartedNs: 0, EndedNs: 60, DurationNs: 60, Kind: model.KindClient, Status: model.StatusOk},
+		{SpanID: "a1", ParentSpanID: "a", Name: "a1", StartedNs: 0, EndedNs: 60, DurationNs: 60, Kind: model.KindInternal, Status: model.StatusError},
+		{SpanID: "b", ParentSpanID: "root", Name: "b", StartedNs: 60, EndedNs: 100, DurationNs: 40, Kind: model.KindInternal, Status: model.StatusOk},
 	}
 	return model.Trace{
 		TraceID: "t1", RunLabel: "build", Source: "mark", RootName: "root",
@@ -145,6 +149,33 @@ func TestWaterfall_EnterOpensInspectorForCursorSpan(t *testing.T) {
 	assert.Equal(t, "a", open.span.SpanID)
 }
 
+func TestWaterfall_InsertsGapRowForUnaccountedTime(t *testing.T) {
+	// One child starting 40ns into a 100ns root leaves a leading gap.
+	tr := model.Trace{
+		TraceID: "g1", RunLabel: "build", Source: "mark", RootName: "root",
+		StartedNs: 0, EndedNs: 100, DurationNs: 100, SpanCount: 2,
+		Spans: []model.Span{
+			{SpanID: "root", Name: "root", StartedNs: 0, EndedNs: 100, DurationNs: 100, Kind: model.KindInternal},
+			{SpanID: "c", ParentSpanID: "root", Name: "compile", StartedNs: 40, EndedNs: 100, DurationNs: 60, Kind: model.KindInternal},
+		},
+	}
+	m := newWaterfallModel(tr, 100, 30)
+
+	require.Len(t, m.visible, 3, "root + synthetic gap + compile")
+	gapRow := m.visible[1]
+	assert.Equal(t, "(gap)", gapRow.span.Name, "the unaccounted leading interval renders as a gap row")
+	assert.False(t, gapRow.hasChildren, "a gap is a leaf")
+
+	// The inspector must resolve the gap row by its synthetic span ID.
+	m.cursor = 1
+	_, cmd := m.Update(keyMsg("enter"))
+	require.NotNil(t, cmd)
+	open, ok := cmd().(openInspectorMsg)
+	require.True(t, ok)
+	assert.Equal(t, "(gap)", open.span.Name)
+	assert.Equal(t, int64(40), open.span.DurationNs, "gap covers [0,40]")
+}
+
 func TestInspector_RendersIdentityLabelsAndAttributes(t *testing.T) {
 	sp := model.Span{
 		SpanID: "a", Name: "compile", Kind: model.KindClient, Status: model.StatusError,
@@ -224,11 +255,18 @@ func gen200SpanTrace() model.Trace {
 		SpanID: "root", Name: "root", StartedNs: 0, EndedNs: 200_000, DurationNs: 200_000,
 		Kind: model.KindInternal, Status: model.StatusOk,
 	})
+	// Children tile [0, 200_000] contiguously so the root has no unaccounted
+	// time — the perf check counts real spans, not synthetic gap rows.
+	const step = int64(200_000) / (n - 1)
 	for i := 1; i < n; i++ {
-		st := int64(i) * 100
+		st := int64(i-1) * step
+		en := int64(i) * step
+		if i == n-1 {
+			en = 200_000
+		}
 		spans = append(spans, model.Span{
 			SpanID: fmt.Sprintf("s%d", i), ParentSpanID: "root", Name: fmt.Sprintf("span-%d", i),
-			StartedNs: st, EndedNs: st + 50, DurationNs: 50,
+			StartedNs: st, EndedNs: en, DurationNs: en - st,
 			Kind: model.KindInternal, Status: model.StatusOk,
 		})
 	}

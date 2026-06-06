@@ -22,6 +22,11 @@ func WriteWaterfall(w io.Writer, tr model.Trace) error {
 		_, err := io.WriteString(w, "(empty trace)\n")
 		return err
 	}
+	// Surface unaccounted time (setup before the first mark, unmarked steps
+	// inside a section) as synthetic gap rows. Render-only: the stored trace is
+	// unchanged. Threshold of one timeline character keeps invisible gaps out.
+	rootDur := root.Span.EndedNs - root.Span.StartedNs
+	InsertGaps(root, GapMinNs(rootDur, DefaultWidth))
 	bars := Layout(root, DefaultWidth)
 
 	nameCol := 0
