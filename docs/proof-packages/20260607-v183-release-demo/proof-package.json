@@ -1,0 +1,114 @@
+{
+  "schema_version": "proof-package.v1",
+  "package_id": "20260607-grotto-v183-release-demo",
+  "subject": {
+    "repo": "Grotto",
+    "lane": "release-demo-proof",
+    "claim": "Grotto v1.8.3 has release, checksum, CI, and demo evidence for the public adapter demo path."
+  },
+  "producer": {
+    "repo": "Grotto",
+    "mode": "release",
+    "commands": [
+      "CGO_ENABLED=0 go build ./...",
+      "go test ./...",
+      "golangci-lint run ./..."
+    ]
+  },
+  "source_state": {
+    "generated_at": "2026-06-07T00:00:00Z",
+    "git_branch": "main",
+    "git_status": "clean",
+    "freshness_window_hours": 168
+  },
+  "claims": [
+    {
+      "id": "release-handoff-complete",
+      "statement": "The handoff records v1.8.3 as the latest public release and names the public demo path.",
+      "status": "passed",
+      "evidence": [
+        "handoff"
+      ]
+    },
+    {
+      "id": "checksums-present",
+      "statement": "Static binary checksums are present for macOS arm64 and Linux amd64 release artifacts.",
+      "status": "passed",
+      "evidence": [
+        "checksums"
+      ]
+    },
+    {
+      "id": "ci-build-test-lint",
+      "statement": "CI defines static no-cgo build, test, and lint gates.",
+      "status": "passed",
+      "evidence": [
+        "ci-workflow"
+      ]
+    },
+    {
+      "id": "junit-demo-asset",
+      "statement": "The README has a JUnit adapter demo asset for the public test-report path.",
+      "status": "passed",
+      "evidence": [
+        "readme",
+        "junit-demo-asset"
+      ]
+    }
+  ],
+  "verification": {
+    "overall": "passed",
+    "checks": [
+      {
+        "name": "release handoff and artifact evidence inspected",
+        "status": "passed"
+      }
+    ],
+    "missing_receipts": [],
+    "known_gaps": [
+      "This package wraps existing release evidence. A new release should refresh the package with fresh command receipts."
+    ]
+  },
+  "safety": {
+    "redaction": "none",
+    "secrets_checked": true,
+    "live_write_performed": false
+  },
+  "artifacts": [
+    {
+      "id": "handoff",
+      "kind": "repo-doc",
+      "path": "../../../HANDOFF.md",
+      "description": "Current release and public demo handoff.",
+      "required": true
+    },
+    {
+      "id": "readme",
+      "kind": "repo-doc",
+      "path": "../../../README.md",
+      "description": "Grotto public README and demo documentation.",
+      "required": true
+    },
+    {
+      "id": "checksums",
+      "kind": "release-receipt",
+      "path": "../../../dist/checksums.txt",
+      "description": "Release artifact checksums.",
+      "required": true
+    },
+    {
+      "id": "ci-workflow",
+      "kind": "ci-contract",
+      "path": "../../../.github/workflows/ci.yml",
+      "description": "Build, test, and lint CI gates.",
+      "required": true
+    },
+    {
+      "id": "junit-demo-asset",
+      "kind": "demo-asset",
+      "path": "../../assets/grotto-junit-demo.svg",
+      "description": "JUnit adapter demo screenshot asset.",
+      "required": true
+    }
+  ]
+}
