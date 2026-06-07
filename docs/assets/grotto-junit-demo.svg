@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="520" viewBox="0 0 960 520" role="img" aria-labelledby="title desc">
+  <title id="title">Grotto JUnit adapter terminal demo</title>
+  <desc id="desc">A terminal-style screenshot showing Grotto importing a JUnit XML report and rendering a per-suite waterfall.</desc>
+  <defs>
+    <linearGradient id="terminal" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#101820"/>
+      <stop offset="1" stop-color="#17212b"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#000000" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+
+  <rect width="960" height="520" fill="#f5f7fb"/>
+  <rect x="48" y="40" width="864" height="440" rx="8" fill="url(#terminal)" filter="url(#shadow)"/>
+  <rect x="48" y="40" width="864" height="42" rx="8" fill="#25313d"/>
+  <rect x="66" y="57" width="12" height="12" rx="6" fill="#ff5f57"/>
+  <rect x="86" y="57" width="12" height="12" rx="6" fill="#ffbd2e"/>
+  <rect x="106" y="57" width="12" height="12" rx="6" fill="#28c840"/>
+  <text x="480" y="66" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#cbd5e1">grotto junit demo</text>
+
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="16">
+    <text x="76" y="124" fill="#7dd3fc">$ ./grotto --version</text>
+    <text x="76" y="152" fill="#dbeafe">grotto v1.8.3</text>
+
+    <text x="76" y="204" fill="#7dd3fc">$ ./grotto run --adapter=junit -- python3 -m pytest</text>
+    <text x="76" y="232" fill="#dbeafe">stored trace e091680ec929674514d8f566fd7627f9</text>
+
+    <text x="76" y="284" fill="#7dd3fc">$ ./grotto show e091680ec929674514d8f566fd7627f9</text>
+
+    <text x="76" y="326" fill="#f8fafc">pytest</text>
+    <rect x="392" y="308" width="420" height="18" rx="3" fill="#60a5fa"/>
+    <text x="826" y="326" fill="#cbd5e1">1.42s</text>
+
+    <text x="96" y="366" fill="#f8fafc">tests/test_api.py</text>
+    <rect x="392" y="348" width="154" height="18" rx="3" fill="#34d399"/>
+    <text x="826" y="366" fill="#cbd5e1">520ms</text>
+
+    <text x="116" y="406" fill="#cbd5e1">test_create_user</text>
+    <rect x="392" y="388" width="64" height="18" rx="3" fill="#a7f3d0"/>
+    <text x="826" y="406" fill="#94a3b8">190ms</text>
+
+    <text x="116" y="438" fill="#cbd5e1">test_update_user</text>
+    <rect x="468" y="420" width="58" height="18" rx="3" fill="#a7f3d0"/>
+    <text x="826" y="438" fill="#94a3b8">170ms</text>
+
+    <text x="96" y="470" fill="#f8fafc">tests/test_cli.py</text>
+    <rect x="628" y="452" width="98" height="18" rx="3" fill="#fbbf24"/>
+    <text x="826" y="470" fill="#cbd5e1">330ms</text>
+  </g>
+</svg>

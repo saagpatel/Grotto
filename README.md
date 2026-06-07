@@ -234,6 +234,8 @@ Per-test spans carry pass/fail status (failed tests get the `!` marker), and the
 
 `grotto run --adapter=junit` turns a JUnit XML report into a per-suite/per-test waterfall. v1.8 targets pytest out of the box: Grotto injects `--junitxml` pointed at a per-run scratch directory, lets pytest write the report, then reads that report back into spans.
 
+![Grotto JUnit adapter demo](docs/assets/grotto-junit-demo.svg)
+
 ```bash
 grotto run --adapter=junit -- python3 -m pytest
 grotto show <trace-id>

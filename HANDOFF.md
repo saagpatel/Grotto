@@ -69,7 +69,8 @@ If pytest is unavailable or the report already exists, import a CI artifact inst
 ## Verification (current as of this handoff)
 `CGO_ENABLED=0 go build ./...` passed · `go test ./...` passed · `golangci-lint run
 ./...` passed with 0 issues · live go-test smoke confirmed shortened package labels ·
-downloaded `v1.8.3` darwin release binary reported `grotto v1.8.3`.
+downloaded `v1.8.3` darwin release binary reported `grotto v1.8.3` · README now
+includes a small JUnit demo screenshot asset.
 
 ## Next Candidates
-1. Add a tiny README GIF/screenshot for the JUnit demo.
+1. Consider a short recorded GIF only if motion would make the public demo clearer.
