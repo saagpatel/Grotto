@@ -22,7 +22,7 @@ This project inherits the global CC setup: 34+ skills, agents, hooks, and MCP pl
 Project-specific overrides only — see IMPLEMENTATION-ROADMAP.md for architecture.
 
 ## Current Phase
-**v1 complete; public release current through v1.8.2.**
+**v1 complete; public release current through v1.8.3.**
 All 7 subcommands live (run/mark/serve/show/list/diff/tui), OTLP receiver, interactive TUI,
 secret redaction on ingest, cross-compiled static binaries, README, and three adapters:
 `cargo`, `go-test`, `junit`. See IMPLEMENTATION-ROADMAP.md and HANDOFF.md.
@@ -54,7 +54,7 @@ Local-first Go CLI + TUI that renders OpenTelemetry trace waterfalls for shell c
 
 ## Current State
 
-**v1 complete; public release current through v1.8.2.**
+**v1 complete; public release current through v1.8.3.**
 All 7 subcommands live (run/mark/serve/show/list/diff/tui), OTLP receiver, interactive TUI,
 secret redaction on ingest, cross-compiled static binaries, README, and three adapters:
 `cargo`, `go-test`, `junit`. See IMPLEMENTATION-ROADMAP.md and HANDOFF.md.
@@ -70,7 +70,7 @@ secret redaction on ingest, cross-compiled static binaries, README, and three ad
 ## How To Run
 
 - Build/test: `CGO_ENABLED=0 go build ./...`, `go test ./...`, `golangci-lint run ./...`.
-- Demo latest release: download `v1.8.2`, verify `grotto v1.8.2`, then run
+- Demo latest release: download `v1.8.3`, verify `grotto v1.8.3`, then run
   `grotto run --adapter=junit -- python3 -m pytest` or import an existing report
   with `grotto run --adapter=junit --junit-file=reports/junit.xml -- true`.
 

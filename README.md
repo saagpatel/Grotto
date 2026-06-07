@@ -62,16 +62,16 @@ Cross-compiled static binaries (`dist/grotto-darwin-arm64`, `dist/grotto-linux-a
 
 ### Install the latest release
 
-The latest public release is [`v1.8.2`](https://github.com/saagpatel/Grotto/releases/tag/v1.8.2), with static binaries and checksums for macOS arm64 and Linux amd64.
+The latest public release is [`v1.8.3`](https://github.com/saagpatel/Grotto/releases/tag/v1.8.3), with static binaries and checksums for macOS arm64 and Linux amd64.
 
 ```bash
 # macOS arm64
-curl -L -o grotto https://github.com/saagpatel/Grotto/releases/download/v1.8.2/grotto-darwin-arm64
+curl -L -o grotto https://github.com/saagpatel/Grotto/releases/download/v1.8.3/grotto-darwin-arm64
 chmod +x grotto
 ./grotto --version
 
 # Linux amd64
-curl -L -o grotto https://github.com/saagpatel/Grotto/releases/download/v1.8.2/grotto-linux-amd64
+curl -L -o grotto https://github.com/saagpatel/Grotto/releases/download/v1.8.3/grotto-linux-amd64
 chmod +x grotto
 ./grotto --version
 ```
@@ -211,7 +211,7 @@ grotto show <trace-id> --sections
 
 ### Auto-instrument `go test` with `--adapter`
 
-The adapter mechanism is pluggable — `cargo` is one, `go-test` is another. `grotto run --adapter=go-test` injects `-json`, parses the event stream, and turns a slow test run into a package → test waterfall:
+The adapter mechanism is pluggable — `cargo` is one, `go-test` is another. `grotto run --adapter=go-test` injects `-json`, parses the event stream, trims this module's import prefix from package labels, and turns a slow test run into a package → test waterfall:
 
 ```bash
 grotto run --adapter=go-test -- go test ./...
@@ -252,7 +252,7 @@ A clean release smoke test looks like this:
 
 ```bash
 $ ./grotto --version
-grotto v1.8.2
+grotto v1.8.3
 
 $ ./grotto run --adapter=junit -- python3 -m pytest
 stored trace e091680ec929674514d8f566fd7627f9

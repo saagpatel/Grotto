@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/saagpatel/grotto/internal/model"
@@ -22,8 +23,13 @@ func (goTestAdapter) Name() string { return "go-test" }
 // Run captures it (and suppresses the raw-JSON passthrough).
 func (goTestAdapter) CapturesStdout() bool { return true }
 
-// jsonFlag activates go test's machine-readable event stream.
-const jsonFlag = "-json"
+const (
+	// jsonFlag activates go test's machine-readable event stream.
+	jsonFlag = "-json"
+	// goTestModulePath is trimmed from internal package span labels so local test
+	// traces stay compact while package identity still uses the full import path.
+	goTestModulePath = "github.com/saagpatel/grotto"
+)
 
 // PrepareArgv appends -json to the go test invocation if it is not already
 // present, so the child emits the event stream the adapter parses.
@@ -102,10 +108,17 @@ func newGoTestStream(rootID string, startNs int64, newSpanID func() string) *goT
 func (s *goTestStream) pkgOf(name string) *spanBuilder {
 	b, ok := s.pkgs[name]
 	if !ok {
-		b = &spanBuilder{id: s.newSpanID(), parentID: s.rootID, name: name, status: model.StatusOk}
+		b = &spanBuilder{id: s.newSpanID(), parentID: s.rootID, name: goTestPackageLabel(name), status: model.StatusOk}
 		s.pkgs[name] = b
 	}
 	return b
+}
+
+func goTestPackageLabel(pkg string) string {
+	if pkg == goTestModulePath {
+		return "."
+	}
+	return strings.TrimPrefix(pkg, goTestModulePath+"/")
 }
 
 // actionOutput marks a `go test -json` "output" event — every line a test prints,

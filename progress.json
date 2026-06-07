@@ -2,8 +2,8 @@
 	"project": "grotto",
 	"module": "github.com/saagpatel/grotto",
 	"current_phase": 4,
-	"current_release": "v1.8.2",
-	"release_status": "v1.8.2 publicly released on GitHub with static darwin-arm64 and linux-amd64 binaries plus checksums",
+	"current_release": "v1.8.3",
+	"release_status": "v1.8.3 publicly released on GitHub with static darwin-arm64 and linux-amd64 binaries plus checksums",
 	"post_v1_releases": [
 		{
 			"version": "v1.7.0",
@@ -67,6 +67,18 @@
 				{
 					"id": "1.8.6",
 					"name": "grotto show --json renders span kind/status as labels instead of raw enum ints",
+					"status": "done"
+				}
+			]
+		},
+		{
+			"version": "v1.8.3",
+			"name": "Shorter Go-Test Package Labels",
+			"status": "released",
+			"tasks": [
+				{
+					"id": "1.8.7",
+					"name": "go-test package spans trim the local module prefix from display labels",
 					"status": "done"
 				}
 			]

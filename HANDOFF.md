@@ -1,10 +1,10 @@
 # Grotto — Session Handoff
 
 ## Status
-**COMPLETE / publicly released through v1.8.2.** v1 -> v1.8.2 are on `main`, twelve
-GitHub releases are tagged, and `v1.8.2` is the latest public release with macOS
+**COMPLETE / publicly released through v1.8.3.** v1 -> v1.8.3 are on `main`, thirteen
+GitHub releases are tagged, and `v1.8.3` is the latest public release with macOS
 arm64 and Linux amd64 binaries plus checksums. The downloaded release binary reports
-`grotto v1.8.2`.
+`grotto v1.8.3`.
 
 ## Shipped This Session (2026-06-06) — v1.3 -> v1.8
 - **v1.4.0** — the cargo build adapter (`grotto run --adapter=cargo` -> per-crate
@@ -25,13 +25,14 @@ Every release followed the same shape: design-first, review-gated before merge,
 and live/dogfood verified. Public release artifacts are attached to GitHub
 releases, with the v1.8 line as the clean JUnit demo target. The `v1.8.1` patch
 adds the existing-artifact `--junit-file=PATH` import path; `v1.8.2` makes
-`grotto show --json` render OTel `kind`/`status` as readable labels.
+`grotto show --json` render OTel `kind`/`status` as readable labels; `v1.8.3`
+shortens go-test package span labels by trimming the local module prefix.
 
 ## Current Public Demo Path
-1. Open the latest release: https://github.com/saagpatel/Grotto/releases/tag/v1.8.2
+1. Open the latest release: https://github.com/saagpatel/Grotto/releases/tag/v1.8.3
 2. Download the static binary for the target platform and verify it against
    `checksums.txt`.
-3. Run `./grotto --version` and expect `grotto v1.8.2`.
+3. Run `./grotto --version` and expect `grotto v1.8.3`.
 4. Demo the newest adapter with:
 
 ```bash
@@ -56,7 +57,8 @@ If pytest is unavailable or the report already exists, import a CI artifact inst
 - cargo: stable `--timings` HTML `UNIT_DATA` (not nightly JSON); DAG edges as
   `cargo.unit`/`cargo.unblocks`; sub-phases as `cargo.section`.
 - go-test: `-json` event stream -> package/test spans, microsecond `Time` fields,
-  error status on fail, incomplete streams close at run end.
+  local module prefix trimmed from package labels, error status on fail, incomplete
+  streams close at run end.
 - junit: pytest-first `--junitxml` injection; JUnit durations are real but start
   times are synthesized sequentially within suites because JUnit XML has no per-test
   start timestamps. Explicit-file imports expand the root span to fit report
@@ -66,9 +68,8 @@ If pytest is unavailable or the report already exists, import a CI artifact inst
 
 ## Verification (current as of this handoff)
 `CGO_ENABLED=0 go build ./...` passed · `go test ./...` passed · `golangci-lint run
-./...` passed with 0 issues · live JSON smoke confirmed `kind`/`status` labels ·
-downloaded `v1.8.2` darwin release binary reported `grotto v1.8.2`.
+./...` passed with 0 issues · live go-test smoke confirmed shortened package labels ·
+downloaded `v1.8.3` darwin release binary reported `grotto v1.8.3`.
 
 ## Next Candidates
 1. Add a tiny README GIF/screenshot for the JUnit demo.
-2. Shorten go-test package names by trimming the common module prefix.

@@ -1,6 +1,6 @@
 {
 	"project": "grotto",
-	"current_release": "v1.8.2",
+	"current_release": "v1.8.3",
 	"post_v1": [
 		{
 			"release": "v1.7.0",
@@ -61,6 +61,19 @@
 				},
 				{
 					"test": "release: downloaded v1.8.2 darwin binary reports grotto v1.8.2",
+					"status": "passing"
+				}
+			]
+		},
+		{
+			"release": "v1.8.3",
+			"tests": [
+				{
+					"test": "adapter: go-test package labels trim the local module prefix while preserving package identity",
+					"status": "passing"
+				},
+				{
+					"test": "release: downloaded v1.8.3 darwin binary reports grotto v1.8.3",
 					"status": "passing"
 				}
 			]

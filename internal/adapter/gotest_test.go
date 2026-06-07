@@ -108,6 +108,72 @@ func TestGoTestAdapter_ParseSpans(t *testing.T) {
 	}
 }
 
+func TestGoTestAdapter_PackageLabel(t *testing.T) {
+	tests := []struct {
+		pkg  string
+		want string
+	}{
+		{pkg: "github.com/saagpatel/grotto", want: "."},
+		{pkg: "github.com/saagpatel/grotto/internal/render", want: "internal/render"},
+		{pkg: "example.com/other/pkg", want: "example.com/other/pkg"},
+	}
+	for _, tt := range tests {
+		if got := goTestPackageLabel(tt.pkg); got != tt.want {
+			t.Errorf("goTestPackageLabel(%q) = %q, want %q", tt.pkg, got, tt.want)
+		}
+	}
+}
+
+func TestGoTestAdapter_ParseSpansShortensModulePackageLabel(t *testing.T) {
+	parseNs := func(s string) int64 {
+		tm, err := time.Parse(time.RFC3339Nano, s)
+		if err != nil {
+			t.Fatalf("parse %q: %v", s, err)
+		}
+		return tm.UnixNano()
+	}
+	stream := strings.Join([]string{
+		`{"Time":"2026-06-06T05:08:39.10Z","Action":"start","Package":"github.com/saagpatel/grotto/internal/render"}`,
+		`{"Time":"2026-06-06T05:08:39.11Z","Action":"run","Package":"github.com/saagpatel/grotto/internal/render","Test":"TestTree"}`,
+		`{"Time":"2026-06-06T05:08:39.15Z","Action":"pass","Package":"github.com/saagpatel/grotto/internal/render","Test":"TestTree","Elapsed":0.04}`,
+		`{"Time":"2026-06-06T05:08:39.16Z","Action":"pass","Package":"github.com/saagpatel/grotto/internal/render","Elapsed":0.06}`,
+	}, "\n")
+
+	next := 0
+	spans, err := goTestAdapter{}.ParseSpans(context.Background(), BuildContext{
+		RootID:  "root",
+		StartNs: parseNs("2026-06-06T05:08:39.00Z"),
+		EndNs:   parseNs("2026-06-06T05:08:39.30Z"),
+		Stdout:  []byte(stream),
+		NewSpanID: func() string {
+			next++
+			return "s" + strconv.Itoa(next)
+		},
+	})
+	if err != nil {
+		t.Fatalf("ParseSpans: %v", err)
+	}
+
+	byName := make(map[string]model.Span, len(spans))
+	for _, span := range spans {
+		byName[span.Name] = span
+	}
+	pkg, ok := byName["internal/render"]
+	if !ok {
+		t.Fatalf("missing shortened package span; spans=%+v", spans)
+	}
+	if _, ok := byName["github.com/saagpatel/grotto/internal/render"]; ok {
+		t.Fatalf("full import path should not be used as display name; spans=%+v", spans)
+	}
+	test, ok := byName["TestTree"]
+	if !ok {
+		t.Fatal("missing TestTree span")
+	}
+	if test.ParentSpanID != pkg.SpanID {
+		t.Errorf("TestTree parent = %q, want shortened package span %q", test.ParentSpanID, pkg.SpanID)
+	}
+}
+
 // TestGoTestStream_MatchesBufferedParse is the streaming-refactor safety net: the
 // live driver (NewStream + Consume per line + Finalize) must produce byte-identical
 // spans to the buffered driver (ParseSpans over the whole stream). Because both feed
