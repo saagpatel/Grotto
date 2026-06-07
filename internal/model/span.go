@@ -5,7 +5,10 @@
 // timestamp format.
 package model
 
-import "sort"
+import (
+	"encoding/json"
+	"sort"
+)
 
 // SpanKind mirrors the OpenTelemetry SpanKind enumeration (0..5).
 type SpanKind int32
@@ -20,6 +23,27 @@ const (
 	KindConsumer    SpanKind = 5
 )
 
+func (k SpanKind) String() string {
+	switch k {
+	case KindInternal:
+		return "internal"
+	case KindServer:
+		return "server"
+	case KindClient:
+		return "client"
+	case KindProducer:
+		return "producer"
+	case KindConsumer:
+		return "consumer"
+	default:
+		return "unspecified"
+	}
+}
+
+func (k SpanKind) MarshalJSON() ([]byte, error) {
+	return json.Marshal(k.String())
+}
+
 // StatusCode mirrors the OpenTelemetry status code enumeration.
 type StatusCode int32
 
@@ -29,6 +53,21 @@ const (
 	StatusOk    StatusCode = 1
 	StatusError StatusCode = 2
 )
+
+func (s StatusCode) String() string {
+	switch s {
+	case StatusOk:
+		return "ok"
+	case StatusError:
+		return "error"
+	default:
+		return "unset"
+	}
+}
+
+func (s StatusCode) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
+}
 
 // Attribute is a single typed key/value pair on a span. Value is stored as a
 // string; type-assert against ValueType ("str"|"int"|"float"|"bool") to recover

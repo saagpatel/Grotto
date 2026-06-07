@@ -48,6 +48,10 @@ func TestWriteJSON_ContainsSpansAndParents(t *testing.T) {
 	assert.Contains(t, out, `"span_count": 6`)
 	assert.Contains(t, out, `"parent_span_id": "build"`)
 	assert.Contains(t, out, `"name": "compile"`)
+	assert.Contains(t, out, `"kind": "internal"`)
+	assert.Contains(t, out, `"status": "ok"`)
+	assert.NotContains(t, out, `"kind": 1`)
+	assert.NotContains(t, out, `"status": 1`)
 }
 
 func TestFormatDuration(t *testing.T) {

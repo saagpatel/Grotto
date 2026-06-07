@@ -62,16 +62,16 @@ Cross-compiled static binaries (`dist/grotto-darwin-arm64`, `dist/grotto-linux-a
 
 ### Install the latest release
 
-The latest public release is [`v1.8.1`](https://github.com/saagpatel/Grotto/releases/tag/v1.8.1), with static binaries and checksums for macOS arm64 and Linux amd64.
+The latest public release is [`v1.8.2`](https://github.com/saagpatel/Grotto/releases/tag/v1.8.2), with static binaries and checksums for macOS arm64 and Linux amd64.
 
 ```bash
 # macOS arm64
-curl -L -o grotto https://github.com/saagpatel/Grotto/releases/download/v1.8.1/grotto-darwin-arm64
+curl -L -o grotto https://github.com/saagpatel/Grotto/releases/download/v1.8.2/grotto-darwin-arm64
 chmod +x grotto
 ./grotto --version
 
 # Linux amd64
-curl -L -o grotto https://github.com/saagpatel/Grotto/releases/download/v1.8.1/grotto-linux-amd64
+curl -L -o grotto https://github.com/saagpatel/Grotto/releases/download/v1.8.2/grotto-linux-amd64
 chmod +x grotto
 ./grotto --version
 ```
@@ -252,7 +252,7 @@ A clean release smoke test looks like this:
 
 ```bash
 $ ./grotto --version
-grotto v1.8.1
+grotto v1.8.2
 
 $ ./grotto run --adapter=junit -- python3 -m pytest
 stored trace e091680ec929674514d8f566fd7627f9
@@ -307,6 +307,11 @@ grotto diff <trace-id-a> <trace-id-b>
 # Interactive TUI: run list → waterfall → span inspector
 grotto tui
 ```
+
+`--json` keeps raw nanosecond fields for scripts, but renders OTel enums as labels
+instead of integers: span `kind` values are `internal`, `server`, `client`,
+`producer`, `consumer`, or `unspecified`; `status` values are `unset`, `ok`, or
+`error`.
 
 ### TUI navigation
 

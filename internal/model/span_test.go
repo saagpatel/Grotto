@@ -1,11 +1,43 @@
 package model
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSpanKindJSONLabels(t *testing.T) {
+	cases := map[SpanKind]string{
+		KindUnspecified: `"unspecified"`,
+		KindInternal:    `"internal"`,
+		KindServer:      `"server"`,
+		KindClient:      `"client"`,
+		KindProducer:    `"producer"`,
+		KindConsumer:    `"consumer"`,
+		SpanKind(99):    `"unspecified"`,
+	}
+	for kind, want := range cases {
+		got, err := json.Marshal(kind)
+		require.NoError(t, err)
+		assert.Equal(t, want, string(got))
+	}
+}
+
+func TestStatusCodeJSONLabels(t *testing.T) {
+	cases := map[StatusCode]string{
+		StatusUnset:    `"unset"`,
+		StatusOk:       `"ok"`,
+		StatusError:    `"error"`,
+		StatusCode(99): `"unset"`,
+	}
+	for status, want := range cases {
+		got, err := json.Marshal(status)
+		require.NoError(t, err)
+		assert.Equal(t, want, string(got))
+	}
+}
 
 // sixSpanFixture returns a 6-span trace shaped as:
 //

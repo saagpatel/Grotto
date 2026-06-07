@@ -1,10 +1,10 @@
 # Grotto — Session Handoff
 
 ## Status
-**COMPLETE / publicly released through v1.8.1.** v1 -> v1.8.1 are on `main`, eleven
-GitHub releases are tagged, and `v1.8.1` is the latest public release with macOS
+**COMPLETE / publicly released through v1.8.2.** v1 -> v1.8.2 are on `main`, twelve
+GitHub releases are tagged, and `v1.8.2` is the latest public release with macOS
 arm64 and Linux amd64 binaries plus checksums. The downloaded release binary reports
-`grotto v1.8.1`.
+`grotto v1.8.2`.
 
 ## Shipped This Session (2026-06-06) — v1.3 -> v1.8
 - **v1.4.0** — the cargo build adapter (`grotto run --adapter=cargo` -> per-crate
@@ -24,13 +24,14 @@ arm64 and Linux amd64 binaries plus checksums. The downloaded release binary rep
 Every release followed the same shape: design-first, review-gated before merge,
 and live/dogfood verified. Public release artifacts are attached to GitHub
 releases, with the v1.8 line as the clean JUnit demo target. The `v1.8.1` patch
-adds the existing-artifact `--junit-file=PATH` import path.
+adds the existing-artifact `--junit-file=PATH` import path; `v1.8.2` makes
+`grotto show --json` render OTel `kind`/`status` as readable labels.
 
 ## Current Public Demo Path
-1. Open the latest release: https://github.com/saagpatel/Grotto/releases/tag/v1.8.1
+1. Open the latest release: https://github.com/saagpatel/Grotto/releases/tag/v1.8.2
 2. Download the static binary for the target platform and verify it against
    `checksums.txt`.
-3. Run `./grotto --version` and expect `grotto v1.8.1`.
+3. Run `./grotto --version` and expect `grotto v1.8.2`.
 4. Demo the newest adapter with:
 
 ```bash
@@ -65,11 +66,9 @@ If pytest is unavailable or the report already exists, import a CI artifact inst
 
 ## Verification (current as of this handoff)
 `CGO_ENABLED=0 go build ./...` passed · `go test ./...` passed · `golangci-lint run
-./...` passed with 0 issues · live `--junit-file` import smoke passed · downloaded
-`v1.8.1` darwin release binary reported `grotto v1.8.1`.
+./...` passed with 0 issues · live JSON smoke confirmed `kind`/`status` labels ·
+downloaded `v1.8.2` darwin release binary reported `grotto v1.8.2`.
 
 ## Next Candidates
 1. Add a tiny README GIF/screenshot for the JUnit demo.
-2. Polish `grotto show --json` kind/status readability (`server`, `error` instead of
-   raw enum ints).
-3. Shorten go-test package names by trimming the common module prefix.
+2. Shorten go-test package names by trimming the common module prefix.

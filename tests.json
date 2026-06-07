@@ -1,6 +1,6 @@
 {
 	"project": "grotto",
-	"current_release": "v1.8.1",
+	"current_release": "v1.8.2",
 	"post_v1": [
 		{
 			"release": "v1.7.0",
@@ -44,6 +44,23 @@
 				},
 				{
 					"test": "collect: adapter graft expands root trace bounds when imported spans outlive the wrapper command",
+					"status": "passing"
+				}
+			]
+		},
+		{
+			"release": "v1.8.2",
+			"tests": [
+				{
+					"test": "model: SpanKind and StatusCode marshal to readable JSON labels with stable fallbacks",
+					"status": "passing"
+				},
+				{
+					"test": "render: WriteJSON emits kind/status labels and does not regress to raw enum ints",
+					"status": "passing"
+				},
+				{
+					"test": "release: downloaded v1.8.2 darwin binary reports grotto v1.8.2",
 					"status": "passing"
 				}
 			]
