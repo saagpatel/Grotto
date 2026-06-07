@@ -1,6 +1,6 @@
 {
 	"project": "grotto",
-	"current_release": "v1.8.0",
+	"current_release": "v1.8.1",
 	"post_v1": [
 		{
 			"release": "v1.7.0",
@@ -20,7 +20,7 @@
 			]
 		},
 		{
-			"release": "v1.8.0",
+			"release": "v1.8.1",
 			"tests": [
 				{
 					"test": "adapter: registry lists cargo, go-test, and junit",
@@ -35,7 +35,15 @@
 					"status": "passing"
 				},
 				{
-					"test": "release: downloaded v1.8.0 darwin binary reports grotto v1.8.0",
+					"test": "release: downloaded v1.8.1 darwin binary reports grotto v1.8.1",
+					"status": "passing"
+				},
+				{
+					"test": "junit: --junit-file reads an existing report, preserves report durations, and errors on missing explicit files",
+					"status": "passing"
+				},
+				{
+					"test": "collect: adapter graft expands root trace bounds when imported spans outlive the wrapper command",
 					"status": "passing"
 				}
 			]

@@ -23,3 +23,16 @@ func TestRunCmd_UnknownAdapter(t *testing.T) {
 		t.Errorf("error %q should mention the unknown adapter name %q", err.Error(), "bogus")
 	}
 }
+
+func TestRunCmd_JUnitFileRejectsOtherAdapters(t *testing.T) {
+	root := NewRootCmd()
+	root.SetArgs([]string{"run", "--adapter=cargo", "--junit-file=report.xml", "--", "true"})
+
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error for --junit-file with non-junit adapter, got nil")
+	}
+	if !strings.Contains(err.Error(), "--junit-file requires --adapter=junit") {
+		t.Errorf("error %q should explain the adapter mismatch", err.Error())
+	}
+}

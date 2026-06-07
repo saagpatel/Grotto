@@ -62,16 +62,16 @@ Cross-compiled static binaries (`dist/grotto-darwin-arm64`, `dist/grotto-linux-a
 
 ### Install the latest release
 
-The latest public release is [`v1.8.0`](https://github.com/saagpatel/Grotto/releases/tag/v1.8.0), with static binaries and checksums for macOS arm64 and Linux amd64.
+The latest public release is [`v1.8.1`](https://github.com/saagpatel/Grotto/releases/tag/v1.8.1), with static binaries and checksums for macOS arm64 and Linux amd64.
 
 ```bash
 # macOS arm64
-curl -L -o grotto https://github.com/saagpatel/Grotto/releases/download/v1.8.0/grotto-darwin-arm64
+curl -L -o grotto https://github.com/saagpatel/Grotto/releases/download/v1.8.1/grotto-darwin-arm64
 chmod +x grotto
 ./grotto --version
 
 # Linux amd64
-curl -L -o grotto https://github.com/saagpatel/Grotto/releases/download/v1.8.0/grotto-linux-amd64
+curl -L -o grotto https://github.com/saagpatel/Grotto/releases/download/v1.8.1/grotto-linux-amd64
 chmod +x grotto
 ./grotto --version
 ```
@@ -239,11 +239,20 @@ grotto run --adapter=junit -- python3 -m pytest
 grotto show <trace-id>
 ```
 
+If you already have a JUnit XML artifact from CI, import it without rerunning the suite:
+
+```bash
+grotto run --adapter=junit --junit-file=reports/junit.xml -- true
+grotto show <trace-id>
+```
+
+The wrapped command still supplies the root trace label and exit status; `true` is enough when the report already exists. In explicit-file mode, Grotto reads the artifact as-is and expands the root span to fit the report durations, so a tiny wrapper command does not squash the waterfall.
+
 A clean release smoke test looks like this:
 
 ```bash
 $ ./grotto --version
-grotto v1.8.0
+grotto v1.8.1
 
 $ ./grotto run --adapter=junit -- python3 -m pytest
 stored trace e091680ec929674514d8f566fd7627f9
@@ -265,7 +274,7 @@ pytest                             ███████████████
     test_run_command                                         █████  190ms
 ```
 
-JUnit XML carries durations but not start times, so Grotto lays tests out sequentially within each suite. That is exact for serial pytest and approximate for parallel runners; the durations remain real. If you pass your own `--junitxml`, Grotto overrides it with a warning so the adapter can reliably read the report it owns.
+JUnit XML carries durations but not start times, so Grotto lays tests out sequentially within each suite. That is exact for serial pytest and approximate for parallel runners; the durations remain real. If you pass your own `--junitxml` in normal capture mode, Grotto overrides it with a warning so the adapter can reliably read the report it owns; use `--junit-file=PATH` when you want to preserve and import an existing artifact.
 
 ### Receive OTLP spans from an instrumented app
 

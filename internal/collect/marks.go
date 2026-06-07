@@ -215,6 +215,28 @@ func graftSpans(tr *model.Trace, spans []model.Span, source string) {
 	tr.Spans = append(tr.Spans, spans...)
 	tr.SpanCount = len(tr.Spans)
 	tr.Source = source
+	extendTraceToFitSpans(tr)
+}
+
+func extendTraceToFitSpans(tr *model.Trace) {
+	maxEnd := tr.EndedNs
+	for _, sp := range tr.Spans {
+		if sp.EndedNs > maxEnd {
+			maxEnd = sp.EndedNs
+		}
+	}
+	if maxEnd <= tr.EndedNs {
+		return
+	}
+	tr.EndedNs = maxEnd
+	tr.DurationNs = tr.EndedNs - tr.StartedNs
+	for i := range tr.Spans {
+		if tr.Spans[i].ParentSpanID == "" {
+			tr.Spans[i].EndedNs = maxEnd
+			tr.Spans[i].DurationNs = tr.Spans[i].EndedNs - tr.Spans[i].StartedNs
+			return
+		}
+	}
 }
 
 // collector accumulates marks received on the run socket.

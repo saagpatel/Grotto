@@ -18,6 +18,7 @@ import (
 // useful waterfall without any source changes.
 func newRunCmd() *cobra.Command {
 	var adapterName string
+	var junitFile string
 
 	cmd := &cobra.Command{
 		Use:   "run -- <command> [args...]",
@@ -39,12 +40,23 @@ func newRunCmd() *cobra.Command {
 			// Resolve the adapter: empty string means "no adapter" (nil passed to
 			// collect.Run preserves today's behavior exactly). An unrecognised name
 			// is a user error surfaced immediately so the run does not start.
+			if junitFile != "" {
+				if adapterName == "" {
+					adapterName = "junit"
+				} else if adapterName != "junit" {
+					return fmt.Errorf("--junit-file requires --adapter=junit, got --adapter=%s", adapterName)
+				}
+			}
 			var ad adapter.Adapter
 			if adapterName != "" {
-				var ok bool
-				ad, ok = adapter.Lookup(adapterName)
-				if !ok {
-					return fmt.Errorf("unknown adapter %q (available: %s)", adapterName, strings.Join(adapter.Names(), ", "))
+				if junitFile != "" {
+					ad = adapter.NewJUnitFile(junitFile)
+				} else {
+					var ok bool
+					ad, ok = adapter.Lookup(adapterName)
+					if !ok {
+						return fmt.Errorf("unknown adapter %q (available: %s)", adapterName, strings.Join(adapter.Names(), ", "))
+					}
 				}
 			}
 
@@ -61,6 +73,8 @@ func newRunCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&adapterName, "adapter", "",
 		fmt.Sprintf("build-tool adapter to emit per-unit spans (%s)", strings.Join(adapter.Names(), ", ")))
+	cmd.Flags().StringVar(&junitFile, "junit-file", "",
+		"read an existing JUnit XML report instead of injecting --junitxml (implies --adapter=junit)")
 
 	return cmd
 }

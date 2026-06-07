@@ -115,6 +115,47 @@ func TestRun_AdapterGraftsSpans(t *testing.T) {
 	assert.True(t, names["crate-b"], "crate-b span must be in the trace")
 }
 
+func TestGraftSpansExtendsTraceBounds(t *testing.T) {
+	tr := model.Trace{
+		TraceID:    "tr",
+		RunLabel:   "true",
+		Source:     "mark",
+		RootName:   "true",
+		StartedNs:  10,
+		EndedNs:    20,
+		DurationNs: 10,
+		SpanCount:  1,
+		Spans: []model.Span{{
+			SpanID:     "root",
+			TraceID:    "tr",
+			Name:       "true",
+			Kind:       model.KindInternal,
+			Status:     model.StatusOk,
+			StartedNs:  10,
+			EndedNs:    20,
+			DurationNs: 10,
+		}},
+	}
+	graftSpans(&tr, []model.Span{{
+		SpanID:       "suite",
+		TraceID:      "tr",
+		ParentSpanID: "root",
+		Name:         "suite",
+		Kind:         model.KindInternal,
+		Status:       model.StatusOk,
+		StartedNs:    10,
+		EndedNs:      110,
+		DurationNs:   100,
+	}}, "junit")
+
+	assert.Equal(t, int64(110), tr.EndedNs)
+	assert.Equal(t, int64(100), tr.DurationNs)
+	assert.Equal(t, int64(110), tr.Spans[0].EndedNs)
+	assert.Equal(t, int64(100), tr.Spans[0].DurationNs)
+	assert.Equal(t, 2, tr.SpanCount)
+	assert.Equal(t, "junit", tr.Source)
+}
+
 // errAdapter is an Adapter whose ParseSpans always fails, modeling a malformed or
 // truncated timing report.
 type errAdapter struct{}

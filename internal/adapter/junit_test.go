@@ -33,6 +33,14 @@ func TestJUnitAdapter_PrepareArgv(t *testing.T) {
 		}
 	})
 
+	t.Run("explicit file mode leaves argv unchanged", func(t *testing.T) {
+		in := []string{"true"}
+		got := junitAdapter{filePath: "/tmp/report.xml"}.PrepareArgv(in, dir)
+		if len(got) != len(in) || got[0] != in[0] {
+			t.Errorf("explicit file mode must not inject args, got %v", got)
+		}
+	})
+
 	t.Run("strips a user --junitxml=path and substitutes grotto's", func(t *testing.T) {
 		got := a.PrepareArgv([]string{"pytest", "--junitxml=/user/out.xml", "-q"}, dir)
 		for _, arg := range got[:len(got)-1] {
@@ -166,6 +174,43 @@ func TestJUnitAdapter_ParseSpans_StatusAndSingleSuiteRoot(t *testing.T) {
 	}
 }
 
+func TestJUnitAdapter_ParseSpans_ExplicitFile(t *testing.T) {
+	const xml = `<testsuite name="imported" tests="2" time="0.030">
+  <testcase name="fast" time="0.010" />
+  <testcase name="slow" time="0.020" />
+</testsuite>`
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "report.xml")
+	if err := os.WriteFile(path, []byte(xml), 0o600); err != nil {
+		t.Fatalf("write explicit report: %v", err)
+	}
+
+	n := 0
+	bc := BuildContext{
+		RootID:    "root",
+		TraceID:   "tr",
+		StartNs:   1_000,
+		EndNs:     1_001, // shorter than the report; explicit file mode must preserve durations.
+		NewSpanID: func() string { n++; return "s" + strconv.Itoa(n) },
+	}
+
+	spans, err := (junitAdapter{filePath: path}).ParseSpans(context.Background(), bc)
+	if err != nil {
+		t.Fatalf("ParseSpans explicit file: %v", err)
+	}
+	byName := make(map[string]model.Span, len(spans))
+	for _, s := range spans {
+		byName[s.Name] = s
+	}
+	if byName["imported"].DurationNs != 30*int64(time.Millisecond) {
+		t.Errorf("suite duration = %d, want 30ms", byName["imported"].DurationNs)
+	}
+	if byName["slow"].DurationNs != 20*int64(time.Millisecond) {
+		t.Errorf("slow duration = %d, want 20ms", byName["slow"].DurationNs)
+	}
+}
+
 func TestJUnitAdapter_ParseSpans_MissingReportIsBenign(t *testing.T) {
 	// No report written: a crash before flush, or a runner that ignored --junitxml.
 	bc := BuildContext{
@@ -179,6 +224,16 @@ func TestJUnitAdapter_ParseSpans_MissingReportIsBenign(t *testing.T) {
 	}
 	if spans != nil {
 		t.Errorf("missing report must yield nil spans, got %d", len(spans))
+	}
+}
+
+func TestJUnitAdapter_ParseSpans_ExplicitMissingReportErrors(t *testing.T) {
+	bc := BuildContext{
+		RootID: "root", TraceID: "tr", StartNs: 0, EndNs: 1_000,
+		NewSpanID: func() string { return "x" },
+	}
+	if _, err := (junitAdapter{filePath: filepath.Join(t.TempDir(), "missing.xml")}).ParseSpans(context.Background(), bc); err == nil {
+		t.Error("explicit missing report must return an error")
 	}
 }
 

@@ -1,7 +1,8 @@
 // Package adapter's junit adapter turns a JUnit XML report into Grotto spans, so
 // any test runner that emits the (near-universal) JUnit schema becomes a per-suite/
-// per-test waterfall. v1.8 targets pytest out of the box: PrepareArgv injects
-// --junitxml pointed at grotto's per-run scratch dir, and ParseSpans reads it back.
+// per-test waterfall. By default, PrepareArgv injects --junitxml pointed at
+// grotto's per-run scratch dir, and ParseSpans reads it back. With an explicit
+// file path, ParseSpans reads an existing CI artifact instead.
 //
 // Unlike cargo (whose --timings report carries absolute start offsets) and go-test
 // (absolute event timestamps), JUnit XML records only a per-testcase DURATION — no
@@ -63,7 +64,15 @@ type junitOutcome struct{}
 // junitAdapter implements Adapter for JUnit-XML-emitting runners (pytest in v1.8).
 // It is a file-reader adapter like cargo: CapturesStdout is false, the child's
 // stdout/stderr pass through to the user, and ParseSpans reads a report file.
-type junitAdapter struct{}
+type junitAdapter struct {
+	filePath string
+}
+
+// NewJUnitFile returns a junit adapter that reads an existing report instead of
+// asking the wrapped command to emit one into grotto's scratch dir.
+func NewJUnitFile(path string) Adapter {
+	return junitAdapter{filePath: path}
+}
 
 // Name returns "junit", the registry key and Trace.Source for junit runs.
 func (junitAdapter) Name() string { return "junit" }
@@ -85,7 +94,10 @@ const (
 // is removed first so grotto's path is authoritative — the adapter must read the
 // report back from a location it chose. Idempotent: the stripped, single grotto
 // flag is the only --junitxml in the result.
-func (junitAdapter) PrepareArgv(argv []string, scratchDir string) []string {
+func (j junitAdapter) PrepareArgv(argv []string, scratchDir string) []string {
+	if j.filePath != "" {
+		return argv
+	}
 	out := make([]string, 0, len(argv)+1)
 	stripped := false
 	for i := 0; i < len(argv); i++ {
@@ -111,15 +123,23 @@ func (junitAdapter) PrepareArgv(argv []string, scratchDir string) []string {
 	return append(out, junitFlag+"="+filepath.Join(scratchDir, junitReportName))
 }
 
-// ParseSpans reads the JUnit report grotto told the runner to write into bc.ScratchDir
-// and returns one span per suite with its testcases nested beneath. A missing report
-// (the runner crashed before writing it, or never ran) is benign: it returns
-// (nil, nil) so the run degrades to the opaque root span. A present-but-malformed
-// report is an error (warned by collect, base trace still stored).
-func (junitAdapter) ParseSpans(_ context.Context, bc BuildContext) ([]model.Span, error) {
+// ParseSpans reads the JUnit report and returns one span per suite with its
+// testcases nested beneath. In normal capture mode it reads the report grotto told
+// the runner to write into bc.ScratchDir. A missing scratch report is benign: it
+// returns (nil, nil) so the run degrades to the opaque root span. With an explicit
+// file path, a missing file is an error because the user specifically requested
+// that artifact. A present-but-malformed report is an error in both modes.
+func (j junitAdapter) ParseSpans(_ context.Context, bc BuildContext) ([]model.Span, error) {
 	path := filepath.Join(bc.ScratchDir, junitReportName)
+	explicitFile := j.filePath != ""
+	if explicitFile {
+		path = j.filePath
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
+		if explicitFile {
+			return nil, fmt.Errorf("junit adapter: read report %q: %w", path, err)
+		}
 		// No report (crash before flush, or a runner that ignored --junitxml).
 		return nil, nil
 	}
@@ -128,7 +148,13 @@ func (junitAdapter) ParseSpans(_ context.Context, bc BuildContext) ([]model.Span
 	if err != nil {
 		return nil, fmt.Errorf("junit adapter: parse report %q: %w", path, err)
 	}
-	return suitesToSpans(suites, bc.RootID, bc.TraceID, bc.StartNs, bc.EndNs, bc.NewSpanID), nil
+	endNs := bc.EndNs
+	if explicitFile {
+		if reportEnd := bc.StartNs + junitReportDurationNs(suites); reportEnd > endNs {
+			endNs = reportEnd
+		}
+	}
+	return suitesToSpans(suites, bc.RootID, bc.TraceID, bc.StartNs, endNs, bc.NewSpanID), nil
 }
 
 // parseJUnit decodes a JUnit report whose root is either <testsuites> (a wrapper of
@@ -224,6 +250,22 @@ func suitesToSpans(suites []junitTestSuite, rootID, traceID string, startNs, end
 		cursor = suiteEnd
 	}
 	return spans
+}
+
+func junitReportDurationNs(suites []junitTestSuite) int64 {
+	var total int64
+	for _, suite := range suites {
+		suiteNs := secondsToNs(suite.Time)
+		var caseNs int64
+		for _, tc := range suite.Cases {
+			caseNs += secondsToNs(tc.Time)
+		}
+		if caseNs > suiteNs {
+			suiteNs = caseNs
+		}
+		total += suiteNs
+	}
+	return total
 }
 
 // suiteName falls back to a stable label when a suite has no name attribute, so the
