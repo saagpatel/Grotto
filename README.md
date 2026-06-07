@@ -58,7 +58,23 @@ golangci-lint run ./...
 go test ./...
 ```
 
-Cross-compiled static binaries (`dist/grotto-darwin-arm64`, `dist/grotto-linux-amd64`, each ~17 MB) are produced via `make build` / `make build-all`. The `CGO_ENABLED=0` gate is enforced from the first commit — any transitive cgo dependency is a hard build failure, not a warning.
+Cross-compiled static binaries (`dist/grotto-darwin-arm64`, `dist/grotto-linux-amd64`, each ~25-26 MB) are produced via `make build` / `make build-all`. The `CGO_ENABLED=0` gate is enforced from the first commit — any transitive cgo dependency is a hard build failure, not a warning.
+
+### Install the latest release
+
+The latest public release is [`v1.8.0`](https://github.com/saagpatel/Grotto/releases/tag/v1.8.0), with static binaries and checksums for macOS arm64 and Linux amd64.
+
+```bash
+# macOS arm64
+curl -L -o grotto https://github.com/saagpatel/Grotto/releases/download/v1.8.0/grotto-darwin-arm64
+chmod +x grotto
+./grotto --version
+
+# Linux amd64
+curl -L -o grotto https://github.com/saagpatel/Grotto/releases/download/v1.8.0/grotto-linux-amd64
+chmod +x grotto
+./grotto --version
+```
 
 ---
 
@@ -132,7 +148,7 @@ grotto show <trace-id> --limit 0    # show every crate, no bucket
 grotto show <trace-id> --json       # full per-crate data, uncollapsed
 ```
 
-The interactive TUI (`grotto tui`) never collapses — you can scroll and inspect every crate. Adapters are pluggable; `cargo` is the first.
+The interactive TUI (`grotto tui`) never collapses — you can scroll and inspect every crate. Adapters are pluggable; `cargo` is the Rust/build adapter.
 
 #### See what the cache saved: diff a cold build against a warm one
 
@@ -213,6 +229,43 @@ go                                ███████████████�
 ```
 
 Per-test spans carry pass/fail status (failed tests get the `!` marker), and the leading `(gap)` is `go test`'s own compile-before-run time. Two runs diff cleanly — `grotto diff <a> <b> --sort=delta` surfaces which tests got slower. (Adding an adapter is one file plus one registry line; `critical-path` and `--sections` are cargo-specific and degrade gracefully on go-test traces.)
+
+### Auto-instrument JUnit XML test reports with `--adapter`
+
+`grotto run --adapter=junit` turns a JUnit XML report into a per-suite/per-test waterfall. v1.8 targets pytest out of the box: Grotto injects `--junitxml` pointed at a per-run scratch directory, lets pytest write the report, then reads that report back into spans.
+
+```bash
+grotto run --adapter=junit -- python3 -m pytest
+grotto show <trace-id>
+```
+
+A clean release smoke test looks like this:
+
+```bash
+$ ./grotto --version
+grotto v1.8.0
+
+$ ./grotto run --adapter=junit -- python3 -m pytest
+stored trace e091680ec929674514d8f566fd7627f9
+
+$ ./grotto show e091680ec929674514d8f566fd7627f9
+pytest        ████████████████████████████████████████  1.42s
+  test_api    ███████████████  520ms
+  test_cli                         █████████  330ms
+```
+
+```
+pytest                             ████████████████████████████████████████  1.42s
+  tests/test_api.py                ███████████████  520ms
+    test_create_user               ██████  190ms
+    test_update_user                     █████  170ms
+    test_delete_user                          ████  160ms
+  tests/test_cli.py                                      █████████  330ms
+    test_help_output                                     ██  70ms
+    test_run_command                                         █████  190ms
+```
+
+JUnit XML carries durations but not start times, so Grotto lays tests out sequentially within each suite. That is exact for serial pytest and approximate for parallel runners; the durations remain real. If you pass your own `--junitxml`, Grotto overrides it with a warning so the adapter can reliably read the report it owns.
 
 ### Receive OTLP spans from an instrumented app
 

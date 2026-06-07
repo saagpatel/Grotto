@@ -1,5 +1,46 @@
 {
 	"project": "grotto",
+	"current_release": "v1.8.0",
+	"post_v1": [
+		{
+			"release": "v1.7.0",
+			"tests": [
+				{
+					"test": "adapter: go-test streaming parse matches buffered ParseSpans output",
+					"status": "passing"
+				},
+				{
+					"test": "collect: StreamAdapter consumes stdout live and grafts finalized spans",
+					"status": "passing"
+				},
+				{
+					"test": "collect: lineWriter bounds memory per line and flushes trailing partial lines",
+					"status": "passing"
+				}
+			]
+		},
+		{
+			"release": "v1.8.0",
+			"tests": [
+				{
+					"test": "adapter: registry lists cargo, go-test, and junit",
+					"status": "passing"
+				},
+				{
+					"test": "junit: PrepareArgv injects --junitxml inside ScratchDir and overrides user paths with warning",
+					"status": "passing"
+				},
+				{
+					"test": "junit: parses testsuites/testsuite XML into suite and testcase spans with pass/fail/error/skip status",
+					"status": "passing"
+				},
+				{
+					"test": "release: downloaded v1.8.0 darwin binary reports grotto v1.8.0",
+					"status": "passing"
+				}
+			]
+		}
+	],
 	"phases": {
 		"0": [
 			{
@@ -151,7 +192,7 @@
 				"status": "passing"
 			},
 			{
-				"test": "build: make build-all -> darwin/arm64 (Mach-O) + linux/amd64 (ELF static), ~17MB each (<25MB)",
+				"test": "build: make build-all -> darwin/arm64 (Mach-O) + linux/amd64 (ELF static)",
 				"status": "passing"
 			}
 		]

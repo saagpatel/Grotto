@@ -22,9 +22,10 @@ This project inherits the global CC setup: 34+ skills, agents, hooks, and MCP pl
 Project-specific overrides only — see IMPLEMENTATION-ROADMAP.md for architecture.
 
 ## Current Phase
-**v1 complete — Phases 0–4 all shipped.**
+**v1 complete; public release current through v1.8.0.**
 All 7 subcommands live (run/mark/serve/show/list/diff/tui), OTLP receiver, interactive TUI,
-secret redaction on ingest, cross-compiled static binaries, README. See IMPLEMENTATION-ROADMAP.md.
+secret redaction on ingest, cross-compiled static binaries, README, and three adapters:
+`cargo`, `go-test`, `junit`. See IMPLEMENTATION-ROADMAP.md and HANDOFF.md.
 
 ## Key Decisions
 | Decision | Choice | Why |
@@ -53,9 +54,10 @@ Local-first Go CLI + TUI that renders OpenTelemetry trace waterfalls for shell c
 
 ## Current State
 
-**v1 complete — Phases 0–4 all shipped.**
+**v1 complete; public release current through v1.8.0.**
 All 7 subcommands live (run/mark/serve/show/list/diff/tui), OTLP receiver, interactive TUI,
-secret redaction on ingest, cross-compiled static binaries, README. See IMPLEMENTATION-ROADMAP.md.
+secret redaction on ingest, cross-compiled static binaries, README, and three adapters:
+`cargo`, `go-test`, `junit`. See IMPLEMENTATION-ROADMAP.md and HANDOFF.md.
 
 ## Stack
 
@@ -67,7 +69,9 @@ secret redaction on ingest, cross-compiled static binaries, README. See IMPLEMEN
 
 ## How To Run
 
-- Review the README and top-level scripts before the next session; this repo does not yet expose one canonical run command inside the new context block.
+- Build/test: `CGO_ENABLED=0 go build ./...`, `go test ./...`, `golangci-lint run ./...`.
+- Demo latest release: download `v1.8.0`, verify `grotto v1.8.0`, then run
+  `grotto run --adapter=junit -- python3 -m pytest`.
 
 ## Known Risks
 

@@ -2,6 +2,59 @@
 	"project": "grotto",
 	"module": "github.com/saagpatel/grotto",
 	"current_phase": 4,
+	"current_release": "v1.8.0",
+	"release_status": "v1.8.0 publicly released on GitHub with static darwin-arm64 and linux-amd64 binaries plus checksums",
+	"post_v1_releases": [
+		{
+			"version": "v1.7.0",
+			"name": "Streaming Adapter Input",
+			"status": "released",
+			"tasks": [
+				{
+					"id": "1.7.1",
+					"name": "StreamAdapter seam for stdout-consuming adapters",
+					"status": "done"
+				},
+				{
+					"id": "1.7.2",
+					"name": "go-test consumes -json stdout line by line instead of buffering whole stream",
+					"status": "done"
+				},
+				{
+					"id": "1.7.3",
+					"name": "lineWriter bounds per-line memory and handles trailing partial lines",
+					"status": "done"
+				}
+			]
+		},
+		{
+			"version": "v1.8.0",
+			"name": "JUnit XML Adapter",
+			"status": "released",
+			"tasks": [
+				{
+					"id": "1.8.1",
+					"name": "junit adapter injects pytest --junitxml into a per-run scratch dir",
+					"status": "done"
+				},
+				{
+					"id": "1.8.2",
+					"name": "JUnit XML parser supports testsuites/testsuite roots and suite/testcase spans",
+					"status": "done"
+				},
+				{
+					"id": "1.8.3",
+					"name": "adapter registry exposes cargo, go-test, and junit",
+					"status": "done"
+				},
+				{
+					"id": "1.8.4",
+					"name": "public v1.8.0 release includes static binaries and checksums",
+					"status": "done"
+				}
+			]
+		}
+	],
 	"phases": [
 		{
 			"phase": 0,
@@ -28,7 +81,11 @@
 					"name": "internal/store SQLite (go:embed migration, insert/get)",
 					"status": "done"
 				},
-				{ "id": "0.5", "name": "progress.json + tests.json", "status": "done" }
+				{
+					"id": "0.5",
+					"name": "progress.json + tests.json",
+					"status": "done"
+				}
 			]
 		},
 		{
@@ -134,7 +191,7 @@
 				},
 				{
 					"id": "4.4",
-					"name": "Makefile cross-compile: darwin/arm64 + linux/amd64 static (~17MB)",
+					"name": "Makefile cross-compile: darwin/arm64 + linux/amd64 static binaries",
 					"status": "done"
 				},
 				{

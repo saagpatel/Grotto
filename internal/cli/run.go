@@ -12,10 +12,10 @@ import (
 
 // newRunCmd builds `grotto run -- <command> [args...]` — execute a command and
 // capture the grotto marks it emits into a single trace. An optional
-// --adapter flag activates a build-tool adapter (e.g. "cargo") that injects
-// tool-specific timing flags and produces per-unit child spans from the
-// build's own timing report, turning an opaque build bar into a crate-level
-// waterfall without any source changes.
+// --adapter flag activates a build/test adapter (e.g. "cargo", "go-test", or
+// "junit") that injects tool-specific timing/report flags and produces per-unit
+// child spans from the tool's own output, turning an opaque command bar into a
+// useful waterfall without any source changes.
 func newRunCmd() *cobra.Command {
 	var adapterName string
 
@@ -24,9 +24,9 @@ func newRunCmd() *cobra.Command {
 		Short: "Run a command and capture grotto marks into a trace",
 		Long: "Run a command, listening for `grotto mark` calls emitted from inside " +
 			"it, and store the result as one trace rooted at the command.\n\n" +
-			"Use --adapter=cargo to capture per-crate timing from a `cargo build`/`cargo " +
-			"test`, or --adapter=go-test to capture per-package/per-test timing from a " +
-			"`go test` run — without modifying your source.",
+			"Use --adapter=cargo for per-crate cargo timing, --adapter=go-test for " +
+			"per-package/per-test Go timing, or --adapter=junit for per-suite/per-test " +
+			"JUnit XML timing — without modifying your source.",
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
