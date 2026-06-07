@@ -58,7 +58,7 @@ golangci-lint run ./...
 go test ./...
 ```
 
-Cross-compiled static binaries (`dist/grotto-darwin-arm64`, `dist/grotto-linux-amd64`, each ~25-26 MB) are produced via `make build` / `make build-all`. The `CGO_ENABLED=0` gate is enforced from the first commit — any transitive cgo dependency is a hard build failure, not a warning.
+Cross-compiled static binaries (`dist/grotto-darwin-arm64`, `dist/grotto-linux-amd64`, each ~17 MB when stripped for release) are produced via `make build` / `make build-all`. The `CGO_ENABLED=0` gate is enforced from the first commit — any transitive cgo dependency is a hard build failure, not a warning.
 
 ### Install the latest release
 
