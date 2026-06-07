@@ -32,15 +32,20 @@ shortens go-test package span labels by trimming the local module prefix.
 1. Open the latest release: https://github.com/saagpatel/Grotto/releases/tag/v1.8.3
 2. Download the static binary for the target platform and verify it against
    `checksums.txt`.
-3. Run `./grotto --version` and expect `grotto v1.8.3`.
-4. Demo the newest adapter with:
+3. Make it executable, optionally rename it to `grotto`, then run `./grotto --version`
+   and expect `grotto v1.8.3`.
+4. Clone the tagged source before running the go-test adapter demo:
 
 ```bash
-./grotto run --adapter=junit -- python3 -m pytest
-./grotto show <trace-id>
+git clone --depth 1 --branch v1.8.3 https://github.com/saagpatel/Grotto.git grotto-demo
+cd grotto-demo
+../grotto run --adapter=go-test -- go test ./internal/render
+../grotto show <trace-id> --limit 12
 ```
 
-If pytest is unavailable or the report already exists, import a CI artifact instead:
+Package rows should render as compact labels like `internal/render`. The README also
+includes a JUnit XML screenshot for the cross-runner test-report path. If pytest is
+unavailable or a report already exists, import a CI artifact instead:
 
 ```bash
 ./grotto run --adapter=junit --junit-file=reports/junit.xml -- true
@@ -70,7 +75,8 @@ If pytest is unavailable or the report already exists, import a CI artifact inst
 `CGO_ENABLED=0 go build ./...` passed · `go test ./...` passed · `golangci-lint run
 ./...` passed with 0 issues · live go-test smoke confirmed shortened package labels ·
 downloaded `v1.8.3` darwin release binary reported `grotto v1.8.3` · README now
-includes a small JUnit demo screenshot asset.
+includes a small JUnit demo screenshot asset · fresh-temp public demo dry run passed
+from only release assets plus a shallow `v1.8.3` clone.
 
 ## Next Candidates
 1. Consider a short recorded GIF only if motion would make the public demo clearer.
