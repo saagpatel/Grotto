@@ -78,18 +78,33 @@ type Attribute struct {
 	Value     string `json:"value"`
 }
 
+// SpanLink preserves an OpenTelemetry link to another span context. Links are
+// ordered on the source span and may target the same trace or a different one.
+// They model causal relationships that are not the span's single parent edge.
+type SpanLink struct {
+	TraceID                string      `json:"trace_id"`
+	SpanID                 string      `json:"span_id"`
+	TraceState             string      `json:"trace_state,omitempty"`
+	Attributes             []Attribute `json:"attributes,omitempty"`
+	DroppedAttributesCount uint32      `json:"dropped_attributes_count,omitempty"`
+	Flags                  uint32      `json:"flags,omitempty"`
+}
+
 // Span is a single OpenTelemetry span. ParentSpanID is empty for a root span.
 type Span struct {
-	SpanID       string      `json:"span_id"`
-	TraceID      string      `json:"trace_id"`
-	ParentSpanID string      `json:"parent_span_id"`
-	Name         string      `json:"name"`
-	Kind         SpanKind    `json:"kind"`
-	Status       StatusCode  `json:"status"`
-	StartedNs    int64       `json:"started_ns"`
-	EndedNs      int64       `json:"ended_ns"`
-	DurationNs   int64       `json:"duration_ns"`
-	Attributes   []Attribute `json:"attributes,omitempty"`
+	SpanID                 string      `json:"span_id"`
+	TraceID                string      `json:"trace_id"`
+	ParentSpanID           string      `json:"parent_span_id"`
+	Name                   string      `json:"name"`
+	Kind                   SpanKind    `json:"kind"`
+	Status                 StatusCode  `json:"status"`
+	StartedNs              int64       `json:"started_ns"`
+	EndedNs                int64       `json:"ended_ns"`
+	DurationNs             int64       `json:"duration_ns"`
+	Attributes             []Attribute `json:"attributes,omitempty"`
+	Links                  []SpanLink  `json:"links,omitempty"`
+	DroppedAttributesCount uint32      `json:"dropped_attributes_count,omitempty"`
+	DroppedLinksCount      uint32      `json:"dropped_links_count,omitempty"`
 }
 
 // Trace is the set of spans sharing one trace ID, plus run-level metadata.

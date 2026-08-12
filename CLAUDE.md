@@ -22,10 +22,12 @@ This project inherits the global CC setup: 34+ skills, agents, hooks, and MCP pl
 Project-specific overrides only — see IMPLEMENTATION-ROADMAP.md for architecture.
 
 ## Current Phase
-**v1 complete; public release current through v1.8.3.**
-All 7 subcommands live (run/mark/serve/show/list/diff/tui), OTLP receiver, interactive TUI,
-secret redaction on ingest, cross-compiled static binaries, README, and three adapters:
-`cargo`, `go-test`, `junit`. See IMPLEMENTATION-ROADMAP.md and HANDOFF.md.
+**v1 complete; public release current through v1.8.3; additive P06 is active in source.**
+The seven released subcommands remain run/mark/serve/show/list/diff/tui. P06 adds
+an eighth, `compaction`, for deterministic local GenAI compaction and response-chain
+reports. The OTLP receiver, interactive TUI, ingest redaction, static binaries, and
+three adapters (`cargo`, `go-test`, `junit`) remain intact. See
+IMPLEMENTATION-ROADMAP.md, P06-COMPACTION-XRAY-DESIGN.md, and HANDOFF.md.
 
 ## Key Decisions
 | Decision | Choice | Why |
@@ -54,10 +56,12 @@ Local-first Go CLI + TUI that renders OpenTelemetry trace waterfalls for shell c
 
 ## Current State
 
-**v1 complete; public release current through v1.8.3.**
-All 7 subcommands live (run/mark/serve/show/list/diff/tui), OTLP receiver, interactive TUI,
-secret redaction on ingest, cross-compiled static binaries, README, and three adapters:
-`cargo`, `go-test`, `junit`. See IMPLEMENTATION-ROADMAP.md and HANDOFF.md.
+**v1 complete; public release current through v1.8.3; additive P06 is active in source.**
+The seven released subcommands remain run/mark/serve/show/list/diff/tui. P06 adds
+`compaction` for deterministic local GenAI compaction and response-chain reports.
+The OTLP receiver, interactive TUI, ingest redaction, static binaries, and three
+adapters (`cargo`, `go-test`, `junit`) remain intact. See IMPLEMENTATION-ROADMAP.md,
+P06-COMPACTION-XRAY-DESIGN.md, and HANDOFF.md.
 
 ## Stack
 

@@ -24,6 +24,13 @@ func sixSpanTrace() model.Trace {
 				{Key: "command", ValueType: "str", Value: "make all"},
 				{Key: "jobs", ValueType: "int", Value: "8"},
 			},
+			Links: []model.SpanLink{{
+				TraceID: "prior-trace", SpanID: "prior-span", TraceState: "vendor=test",
+				Attributes:             []model.Attribute{{Key: "gen_ai.response.id", ValueType: "str", Value: "resp_prior"}},
+				DroppedAttributesCount: 1, Flags: 1,
+			}},
+			DroppedAttributesCount: 2,
+			DroppedLinksCount:      3,
 		},
 		{SpanID: "s2", TraceID: "trace-1", ParentSpanID: "s1", Name: "compile", Kind: model.KindInternal, Status: model.StatusOk, StartedNs: 10, EndedNs: 200, DurationNs: 190},
 		{SpanID: "s4", TraceID: "trace-1", ParentSpanID: "s2", Name: "parse", Kind: model.KindInternal, Status: model.StatusOk, StartedNs: 20, EndedNs: 90, DurationNs: 70},

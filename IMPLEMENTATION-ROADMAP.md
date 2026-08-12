@@ -277,3 +277,39 @@ brew install otel-cli                        # optional, Phase 2 receiver testin
 - Rationale: diff + list are independent query commands; README has no code dependency.
 - worktree note: push the Phase 3 branch first, or set `worktree.baseRef: "head"` before dispatch.
 **Phase-end review:** Run `/ultrareview`. Address all findings before marking the phase complete.
+
+---
+
+## Additive Phase P06: Compaction X-Ray
+
+**Authorization:** Explicitly selected material product increment, 2026-08-11. This
+phase is additive to the completed v1-v1.8 roadmap and does not reactivate any
+other candidate feature.
+
+**Objective:** Import or load genuine OpenTelemetry GenAI spans and render a
+deterministic, content-free view of compaction boundaries, response-chain
+continuity, token discontinuities, structural context resets, missing ancestry,
+and supplied structural answer fingerprints.
+
+**Ownership boundary:** P06 owns `internal/compaction`, compaction-only fixtures
+and tests, the Compaction X-Ray report/renderer, real OTel span-link persistence,
+and minimal CLI/docs integration. P08 owns redaction preview. P09 owns token and
+cache ledgers. P06 may read already-redacted token attributes but does not create
+a general token ledger or redaction UI.
+
+**Locked constraints:**
+- Core normalization is provider-neutral and consumes standard OTel GenAI
+  attributes plus real OTel span links.
+- Provider extensions live behind a narrow adapter and are labeled experimental.
+- Missing or malformed evidence is `UNKNOWN`; token movement alone never implies
+  semantic or answer-quality degradation.
+- Answer-drift indicators compare only caller-supplied synthetic labels, hashes,
+  or structural fingerprints. Grotto never reads or hashes transcript content.
+- Fixture import, normalization, report generation, and rendering make no network
+  calls and preserve Grotto's local SQLite, pure-Go, zero-cloud posture.
+
+**Deliverables and acceptance:** See `P06-COMPACTION-XRAY-DESIGN.md`. The phase is
+complete only when deterministic OTLP fixtures cover no/one/repeated compaction,
+broken and branched chains, out-of-order spans, missing tokens, context reset,
+truncation, and provider extensions; focused negative/privacy tests pass; and the
+repository format, test, static-build, and available lint gates are green.

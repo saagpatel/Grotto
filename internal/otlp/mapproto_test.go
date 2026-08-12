@@ -76,6 +76,31 @@ func TestMapExportRequest_Empty(t *testing.T) {
 	assert.Empty(t, MapExportRequest(nil))
 }
 
+func TestMapExportRequest_PreservesLinksAndDroppedCounts(t *testing.T) {
+	root := pbSpan(fxTraceID, fxRootID, nil, "root", tracepb.Span_SPAN_KIND_INTERNAL, tracepb.Status_STATUS_CODE_OK, 0, 10)
+	child := pbSpan(fxTraceID, fxAID, fxRootID, "child", tracepb.Span_SPAN_KIND_CLIENT, tracepb.Status_STATUS_CODE_OK, 1, 9)
+	child.DroppedAttributesCount = 2
+	child.DroppedLinksCount = 3
+	child.Links = []*tracepb.Span_Link{{
+		TraceId: fxTraceID, SpanId: fxBID, TraceState: "vendor=test", Flags: 1,
+		DroppedAttributesCount: 4,
+		Attributes:             []*commonpb.KeyValue{strAttr("gen_ai.response.id", "resp_prior")},
+	}}
+
+	traces := MapExportRequest(pbRequest("svc", root, child))
+	require.Len(t, traces, 1)
+	require.Len(t, traces[0].Spans, 2)
+	got := traces[0].Spans[1]
+	assert.Equal(t, uint32(2), got.DroppedAttributesCount)
+	assert.Equal(t, uint32(3), got.DroppedLinksCount)
+	require.Len(t, got.Links, 1)
+	assert.Equal(t, hex.EncodeToString(fxBID), got.Links[0].SpanID)
+	assert.Equal(t, "vendor=test", got.Links[0].TraceState)
+	assert.Equal(t, uint32(4), got.Links[0].DroppedAttributesCount)
+	assert.Equal(t, uint32(1), got.Links[0].Flags)
+	assert.Equal(t, model.Attribute{Key: "gen_ai.response.id", ValueType: "str", Value: "resp_prior"}, got.Links[0].Attributes[0])
+}
+
 func TestBuildTrace_Label(t *testing.T) {
 	root := model.Span{SpanID: "r", Name: "POST /checkout", EndedNs: 10}
 	tests := []struct {

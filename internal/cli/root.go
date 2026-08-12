@@ -40,6 +40,7 @@ func NewRootCmd() *cobra.Command {
 		newShowCmd(),
 		newListCmd(),
 		newDiffCmd(),
+		newCompactionCmd(),
 		newTUICmd(),
 	)
 	return root

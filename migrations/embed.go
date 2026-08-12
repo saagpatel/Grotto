@@ -4,9 +4,13 @@ package migrations
 
 import _ "embed"
 
-// Schema is the initial database schema (traces, spans, span_attributes, and
-// their indexes). It is idempotent (CREATE ... IF NOT EXISTS) and safe to run on
-// every Open.
+// Schema is the ordered, additive database schema. Every statement is
+// idempotent, so existing local databases gain later tables safely on Open.
 //
 //go:embed 001_init.sql
-var Schema string
+var initialSchema string
+
+//go:embed 002_span_links.sql
+var spanLinksSchema string
+
+var Schema = initialSchema + "\n" + spanLinksSchema

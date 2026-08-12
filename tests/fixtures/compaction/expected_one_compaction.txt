@@ -1,0 +1,4 @@
+Compaction X-Ray v1  trace 11111111111111111111111111111111  3 source spans
+01 [?] resp_before          root                     in=10000 out=500 Δin=UNKNOWN reset=unknown drift=unknown
+02 [COMPACT] resp_after           linked←resp_before       in=3500 out=550 Δin=-6500 reset=detected drift=changed
+claim ceiling: structural indicators only; no semantic-quality claim
