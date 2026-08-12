@@ -1,0 +1,188 @@
+{
+  "schema": "grotto.redaction-policy.v1",
+  "policy_id": "grotto.safe-default",
+  "version": "1.0.0",
+  "description": "Local-first raw-content-off policy for OpenTelemetry and GenAI traces.",
+  "max_depth": 8,
+  "max_value_bytes": 1024,
+  "inspect_json_paths": [
+    "spans[*].attributes[\"payload\"]",
+    "spans[*].attributes[\"body\"]",
+    "spans[*].attributes[\"*.json\"]"
+  ],
+  "rules": [
+    {
+      "id": "secret.legacy-credential-shapes",
+      "priority": 2000,
+      "path": "*",
+      "value_regex": "AKIA[0-9A-Z]{16}|ghp_[0-9A-Za-z]{36}|sk-[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}",
+      "category": "credential",
+      "action": "mask",
+      "explanation": "Credential-shaped substrings are masked at the canonical boundary.",
+      "provenance": "grotto.legacy-ingest-regression",
+      "replacement": "‹redacted›"
+    },
+    {
+      "id": "secret.bearer-and-jwt",
+      "priority": 1990,
+      "path": "*",
+      "value_regex": "(?i)Bearer\\s+[A-Za-z0-9._~+/-]{8,}={0,2}|eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}",
+      "category": "token",
+      "action": "mask",
+      "explanation": "Bearer and JWT-shaped substrings are masked.",
+      "provenance": "grotto.safe-default",
+      "replacement": "‹redacted›"
+    },
+    {
+      "id": "header.authorization",
+      "priority": 1900,
+      "path": "spans[*].attributes[\"*authorization*\"]",
+      "category": "authorization_header",
+      "action": "mask",
+      "explanation": "Authorization header values are never retained by default.",
+      "provenance": "otel.sensitive-data.credentials"
+    },
+    {
+      "id": "header.cookie",
+      "priority": 1890,
+      "path": "spans[*].attributes[\"*cookie*\"]",
+      "category": "cookie",
+      "action": "mask",
+      "explanation": "Cookie and set-cookie values can carry session credentials.",
+      "provenance": "otel.sensitive-data.session-tokens"
+    },
+    {
+      "id": "key.token",
+      "priority": 1880,
+      "path": "spans[*].attributes[\"*token*\"]",
+      "category": "token",
+      "action": "mask",
+      "explanation": "Token-named attributes are masked regardless of token shape.",
+      "provenance": "otel.sensitive-data.session-tokens"
+    },
+    {
+      "id": "genai.messages",
+      "priority": 1800,
+      "path": "spans[*].attributes[\"gen_ai.*messages*\"]",
+      "category": "genai_content",
+      "action": "drop",
+      "explanation": "GenAI input and output message content is opt-in and likely sensitive, so the safe default drops it.",
+      "provenance": "otel.genai.opt-in-content"
+    },
+    {
+      "id": "genai.system-instructions",
+      "priority": 1800,
+      "path": "spans[*].attributes[\"gen_ai.system_instructions\"]",
+      "category": "genai_content",
+      "action": "drop",
+      "explanation": "System instructions may contain sensitive content and are dropped by default.",
+      "provenance": "otel.genai.opt-in-content"
+    },
+    {
+      "id": "genai.tool-content",
+      "priority": 1800,
+      "path": "spans[*].attributes[\"*tool*argument*\"]",
+      "category": "tool_arguments",
+      "action": "drop",
+      "explanation": "Tool arguments can contain secrets or user data and are dropped by default.",
+      "provenance": "otel.genai.opt-in-content"
+    },
+    {
+      "id": "genai.tool-results",
+      "priority": 1800,
+      "path": "spans[*].attributes[\"*tool*result*\"]",
+      "category": "tool_results",
+      "action": "drop",
+      "explanation": "Tool results can contain private application data and are dropped by default.",
+      "provenance": "otel.genai.opt-in-content"
+    },
+    {
+      "id": "genai.prompt",
+      "priority": 1790,
+      "path": "spans[*].attributes[\"*prompt*\"]",
+      "category": "prompt",
+      "action": "drop",
+      "explanation": "Prompt content is raw user or application content and is dropped by default.",
+      "provenance": "otel.genai.opt-in-content"
+    },
+    {
+      "id": "genai.completion",
+      "priority": 1790,
+      "path": "spans[*].attributes[\"*completion*\"]",
+      "category": "completion",
+      "action": "drop",
+      "explanation": "Completion content may contain user/PII data and is dropped by default.",
+      "provenance": "otel.genai.opt-in-content"
+    },
+    {
+      "id": "pii.email",
+      "priority": 1700,
+      "path": "*",
+      "value_regex": "(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}",
+      "category": "email",
+      "action": "mask",
+      "explanation": "Email addresses are personal identifiers and are masked.",
+      "provenance": "otel.sensitive-data.pii",
+      "replacement": "‹redacted-email›"
+    },
+    {
+      "id": "pii.home-path",
+      "priority": 1690,
+      "path": "*",
+      "value_regex": "/Users/[^/\\s]+|/home/[^/\\s]+",
+      "category": "home_path",
+      "action": "mask",
+      "explanation": "Home-directory user components are masked.",
+      "provenance": "grotto.data-minimization",
+      "replacement": "/home/‹redacted›"
+    },
+    {
+      "id": "url.query-string",
+      "priority": 1600,
+      "path": "spans[*].attributes[\"*url*\"]",
+      "value_regex": "[?&][^#\\s]*",
+      "category": "url_query",
+      "action": "mask",
+      "explanation": "URL query strings may contain credentials and user data.",
+      "provenance": "otel.collector.redaction.url-sanitizer",
+      "replacement": "?‹redacted›"
+    },
+    {
+      "id": "exception.message-bound",
+      "priority": 900,
+      "path": "spans[*].attributes[\"exception.message\"]",
+      "category": "exception_message",
+      "action": "truncate",
+      "explanation": "Exception messages are length-bounded after higher-priority sensitive patterns run.",
+      "provenance": "grotto.data-minimization",
+      "max_length": 256
+    },
+    {
+      "id": "allow.http-method",
+      "priority": 500,
+      "path": "spans[*].attributes[\"http.request.method\"]",
+      "category": "protocol_metadata",
+      "action": "retain",
+      "explanation": "The HTTP method is low-cardinality protocol metadata.",
+      "provenance": "grotto.safe-allowlist"
+    },
+    {
+      "id": "nested.authorization",
+      "priority": 1500,
+      "path": "*.json[\"*authorization*\"]",
+      "category": "authorization_header",
+      "action": "mask",
+      "explanation": "Nested authorization values are masked.",
+      "provenance": "grotto.safe-default"
+    },
+    {
+      "id": "nested.token",
+      "priority": 1490,
+      "path": "*.json[\"*token*\"]",
+      "category": "token",
+      "action": "mask",
+      "explanation": "Nested token values are masked.",
+      "provenance": "grotto.safe-default"
+    }
+  ]
+}

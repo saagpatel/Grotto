@@ -1,0 +1,15 @@
+{
+  "schema": "grotto.redaction-policy.v1",
+  "policy_id": "fixture.conflicts",
+  "version": "1.0.0",
+  "description": "Synthetic precedence and size-bound fixture.",
+  "max_depth": 3,
+  "max_value_bytes": 64,
+  "inspect_json_paths": ["spans[*].attributes[\"payload\"]"],
+  "rules": [
+    {"id": "allow.reserved-email", "priority": 200, "path": "spans[*].attributes[\"contact\"]", "value_regex": "^support@example\\.test$", "category": "allowlist", "action": "retain", "explanation": "Reserved fixture allowlist.", "provenance": "fixture"},
+    {"id": "block.email", "priority": 100, "path": "*", "value_regex": "(?i).+@example\\.test", "category": "email", "action": "mask", "explanation": "General fixture block.", "provenance": "fixture"},
+    {"id": "hash.binary", "priority": 90, "path": "spans[*].attributes[\"binary.payload\"]", "category": "binary", "action": "hash", "explanation": "Binary fixture digest.", "provenance": "fixture"},
+    {"id": "drop.nested-token", "priority": 80, "path": "*.json[\"token\"]", "category": "token", "action": "drop", "explanation": "Nested fixture token.", "provenance": "fixture"}
+  ]
+}

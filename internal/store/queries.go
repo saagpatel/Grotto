@@ -49,7 +49,10 @@ func (s *Store) InsertTrace(ctx context.Context, t model.Trace) (err error) {
 	// Scrub credential-shaped strings before anything touches disk. Both capture
 	// paths (marks + OTLP) funnel through here, so this is the one place redaction
 	// has to live.
-	t = Redact(t)
+	t, err = Redact(t)
+	if err != nil {
+		return fmt.Errorf("redact trace %q: %w", t.TraceID, err)
+	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

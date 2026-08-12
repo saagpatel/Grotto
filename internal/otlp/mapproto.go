@@ -101,7 +101,7 @@ func mapAttribute(kv *commonpb.KeyValue) model.Attribute {
 	case *commonpb.AnyValue_DoubleValue:
 		a.ValueType, a.Value = "float", strconv.FormatFloat(v.DoubleValue, 'g', -1, 64)
 	case *commonpb.AnyValue_BytesValue:
-		a.ValueType, a.Value = "str", hex.EncodeToString(v.BytesValue)
+		a.ValueType, a.Value = "bytes", hex.EncodeToString(v.BytesValue)
 	default:
 		a.Value = kv.GetValue().String() // array/kvlist/empty: best-effort
 	}

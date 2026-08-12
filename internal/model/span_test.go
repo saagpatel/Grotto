@@ -39,6 +39,23 @@ func TestStatusCodeJSONLabels(t *testing.T) {
 	}
 }
 
+func TestSpanEnumsUnmarshalReadableAndNumericForms(t *testing.T) {
+	var kind SpanKind
+	require.NoError(t, json.Unmarshal([]byte(`"client"`), &kind))
+	assert.Equal(t, KindClient, kind)
+	require.NoError(t, json.Unmarshal([]byte(`4`), &kind))
+	assert.Equal(t, KindProducer, kind)
+
+	var status StatusCode
+	require.NoError(t, json.Unmarshal([]byte(`"error"`), &status))
+	assert.Equal(t, StatusError, status)
+	require.NoError(t, json.Unmarshal([]byte(`1`), &status))
+	assert.Equal(t, StatusOk, status)
+
+	assert.Error(t, json.Unmarshal([]byte(`"mystery"`), &kind))
+	assert.Error(t, json.Unmarshal([]byte(`99`), &status))
+}
+
 // sixSpanFixture returns a 6-span trace shaped as:
 //
 //	root

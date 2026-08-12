@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -58,6 +59,27 @@ func Open(ctx context.Context, path string) (*Store, error) {
 	if _, err := db.ExecContext(ctx, migrations.Schema); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("apply schema: %w", err)
+	}
+	return &Store{db: db}, nil
+}
+
+// OpenReadOnly opens an existing SQLite database without creating directories,
+// applying migrations, or allowing SQLite journals/WAL sidecars. immutable=1 is
+// appropriate for a bounded preview that promises byte-stable source state.
+func OpenReadOnly(ctx context.Context, path string) (*Store, error) {
+	if _, err := os.Stat(path); err != nil {
+		return nil, fmt.Errorf("stat sqlite %q: %w", path, err)
+	}
+	dsnURL := &url.URL{Scheme: "file", Path: path, RawQuery: "mode=ro&immutable=1"}
+	dsn := dsnURL.String()
+	db, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("open sqlite read-only %q: %w", path, err)
+	}
+	db.SetMaxOpenConns(1)
+	if err := db.PingContext(ctx); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("ping sqlite read-only %q: %w", path, err)
 	}
 	return &Store{db: db}, nil
 }

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/saagpatel/Grotto/schemas/redaction-policy-v1.schema.json",
+  "title": "Grotto Redaction Policy V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "policy_id", "version", "description", "max_depth", "max_value_bytes", "inspect_json_paths", "rules"],
+  "properties": {
+    "schema": {"const": "grotto.redaction-policy.v1"},
+    "policy_id": {"type": "string", "pattern": "^[A-Za-z0-9._-]+$", "maxLength": 128},
+    "version": {"type": "string", "pattern": "^[A-Za-z0-9._-]+$", "maxLength": 128},
+    "description": {"type": "string"},
+    "max_depth": {"type": "integer", "minimum": 1, "maximum": 64},
+    "max_value_bytes": {"type": "integer", "minimum": 32, "maximum": 16777216},
+    "inspect_json_paths": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "rules": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/rule"}
+    }
+  },
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "priority", "path", "category", "action", "explanation", "provenance"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[A-Za-z0-9._-]+$", "maxLength": 128},
+        "priority": {"type": "integer"},
+        "path": {"type": "string", "minLength": 1},
+        "value_regex": {"type": "string"},
+        "category": {"type": "string", "minLength": 1},
+        "action": {"enum": ["retain", "mask", "hash", "truncate", "drop"]},
+        "explanation": {"type": "string", "minLength": 1},
+        "provenance": {"type": "string", "minLength": 1},
+        "replacement": {"type": "string"},
+        "max_length": {"type": "integer", "minimum": 1}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"action": {"const": "truncate"}}, "required": ["action"]},
+          "then": {"required": ["max_length"]}
+        }
+      ]
+    }
+  }
+}

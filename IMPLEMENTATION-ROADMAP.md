@@ -72,7 +72,7 @@ CREATE TABLE spans (
 CREATE TABLE span_attributes (
     span_id    TEXT NOT NULL REFERENCES spans(span_id) ON DELETE CASCADE,
     key        TEXT NOT NULL,
-    value_type TEXT NOT NULL,             -- 'str'|'int'|'float'|'bool'
+    value_type TEXT NOT NULL,             -- 'str'|'int'|'float'|'bool'|'bytes'|'json'
     value      TEXT NOT NULL,
     PRIMARY KEY (span_id, key)
 );
@@ -93,7 +93,7 @@ type StatusCode int32 // 0 Unset, 1 Ok, 2 Error
 
 type Attribute struct {
     Key       string
-    ValueType string // "str"|"int"|"float"|"bool"
+    ValueType string // "str"|"int"|"float"|"bool"|"bytes"|"json"
     Value     string // stringified; type-assert on ValueType
 }
 type Span struct {
@@ -277,3 +277,24 @@ brew install otel-cli                        # optional, Phase 2 receiver testin
 - Rationale: diff + list are independent query commands; README has no code dependency.
 - worktree note: push the Phase 3 branch first, or set `worktree.baseRef: "head"` before dispatch.
 **Phase-end review:** Run `/ultrareview`. Address all findings before marking the phase complete.
+
+## Phase P08: Trace Redaction Preview (selected 2026-08-11)
+
+**Objective:** Add a deterministic, local-only dry-run disclosure plan for stored or imported traces. The preview reports what the canonical ingest redaction evaluator will retain, mask, hash, truncate, or drop without mutating SQLite or the source file and without displaying raw candidate secrets.
+
+**Design authority:** [`docs/design/phase-p08-trace-redaction-preview.md`](docs/design/phase-p08-trace-redaction-preview.md). This is an additive post-v1 product increment. It builds on the existing `InsertTrace -> Redact` chokepoint; it does not introduce a competing sanitizer.
+
+**Ownership boundary:**
+
+- P08 owns `internal/redaction`, redaction policy/report schemas, P08 synthetic fixtures, the `redact-preview` CLI, privacy/design documentation, and the minimal `internal/store`/CLI-root integration needed to share one evaluator.
+- P06 owns compaction visualization. P09 owns token and cache ledgers. P08 does not modify those surfaces.
+- A TUI screen is intentionally not part of this increment: the existing TUI reads already-redacted SQLite data, while the safety-critical pre-persistence value is an explicit CLI preview of an imported trace. Adding a TUI import/reveal path would widen the secret-handling surface without improving the canonical evaluator.
+
+**Acceptance:**
+
+1. A versioned policy and preview-report contract define field paths, deterministic precedence, actions, explanations, provenance, conservative `UNKNOWN`, bounded JSON inspection, and stable SHA-256 digests without escrow.
+2. `grotto redact-preview <trace-id>` opens SQLite read-only and `grotto redact-preview --file <trace.json>` reads a source file without writes. Default and JSON output never contain raw candidate secrets; no reveal mode exists.
+3. `internal/store.InsertTrace` and preview call the same evaluator. Existing four-pattern ingest behavior remains regression-covered.
+4. Synthetic fixtures cover headers, credentials, cookies, emails, home paths, URL queries, GenAI inputs/outputs, tool payloads, exceptions, nested/malformed JSON, binary/oversized values, allowlists, custom attributes, and conflicts.
+5. Focused tests prove precedence, idempotence, source/database byte stability, deterministic digests, Unicode and depth bounds, false-positive controls, no raw-secret output, and no network dependency.
+6. `gofmt`, `go test ./...`, `CGO_ENABLED=0 go build ./...`, and `golangci-lint run ./...` (when available) pass, with a reproducible five-minute demo documented.

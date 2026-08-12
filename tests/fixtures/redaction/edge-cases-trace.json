@@ -1,0 +1,29 @@
+{
+  "trace_id": "00000000000000000000000000000009",
+  "run_label": "synthetic edge cases",
+  "source": "otlp",
+  "root_name": "edge",
+  "started_ns": 1,
+  "ended_ns": 2,
+  "duration_ns": 1,
+  "span_count": 1,
+  "spans": [{
+    "span_id": "0000000000000009",
+    "trace_id": "00000000000000000000000000000009",
+    "parent_span_id": "",
+    "name": "edge",
+    "kind": "internal",
+    "status": "ok",
+    "started_ns": 1,
+    "ended_ns": 2,
+    "duration_ns": 1,
+    "attributes": [
+      {"key": "contact", "value_type": "str", "value": "support@example.test"},
+      {"key": "other.contact", "value_type": "str", "value": "other@example.test"},
+      {"key": "unicode", "value_type": "str", "value": "界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界"},
+      {"key": "binary.payload", "value_type": "bytes", "value": "00010203aabbccdd"},
+      {"key": "payload", "value_type": "json", "value": "{\"outer\":{\"inner\":{\"token\":\"fake-only\",\"safe\":\"fixture\"}}}"},
+      {"key": "malformed", "value_type": "json", "value": "{\"not_closed\":"}
+    ]
+  }]
+}

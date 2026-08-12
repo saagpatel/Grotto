@@ -1,0 +1,60 @@
+{
+  "schema": "grotto.redaction-policy.v1",
+  "policy_id": "example.team-policy",
+  "version": "1.0.0",
+  "description": "Synthetic example showing allowlist, mask, hash, truncate, and drop actions.",
+  "max_depth": 6,
+  "max_value_bytes": 512,
+  "inspect_json_paths": ["spans[*].attributes[\"payload\"]"],
+  "rules": [
+    {
+      "id": "allow.synthetic-support-address",
+      "priority": 300,
+      "path": "spans[*].attributes[\"contact\"]",
+      "value_regex": "^support@example\\.test$",
+      "category": "allowlist",
+      "action": "retain",
+      "explanation": "This exact reserved-domain fixture value is approved.",
+      "provenance": "example.explicit-allowlist"
+    },
+    {
+      "id": "mask.other-emails",
+      "priority": 200,
+      "path": "*",
+      "value_regex": "(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}",
+      "category": "email",
+      "action": "mask",
+      "explanation": "Other email addresses are masked.",
+      "provenance": "example.pii",
+      "replacement": "‹redacted-email›"
+    },
+    {
+      "id": "hash.synthetic-correlation-id",
+      "priority": 180,
+      "path": "spans[*].attributes[\"correlation.id\"]",
+      "category": "high_entropy_identifier",
+      "action": "hash",
+      "explanation": "The synthetic high-entropy correlation ID is represented by a stable digest.",
+      "provenance": "example.digest"
+    },
+    {
+      "id": "truncate.exception",
+      "priority": 150,
+      "path": "spans[*].attributes[\"exception.message\"]",
+      "category": "exception_message",
+      "action": "truncate",
+      "explanation": "Exception text is bounded.",
+      "provenance": "example.data-minimization",
+      "max_length": 96
+    },
+    {
+      "id": "drop.prompt",
+      "priority": 140,
+      "path": "spans[*].attributes[\"gen_ai.input.messages\"]",
+      "category": "genai_content",
+      "action": "drop",
+      "explanation": "Prompt content is not shared.",
+      "provenance": "example.genai-opt-in"
+    }
+  ]
+}

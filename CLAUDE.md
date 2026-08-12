@@ -27,6 +27,10 @@ All 7 subcommands live (run/mark/serve/show/list/diff/tui), OTLP receiver, inter
 secret redaction on ingest, cross-compiled static binaries, README, and three adapters:
 `cargo`, `go-test`, `junit`. See IMPLEMENTATION-ROADMAP.md and HANDOFF.md.
 
+**Active additive increment:** P08 adds an eighth source-level command,
+`redact-preview`, plus a versioned canonical ingest/preview evaluator. This is
+branch state until merged and is not part of the v1.8.3 public binary.
+
 ## Key Decisions
 | Decision | Choice | Why |
 |----------|--------|-----|
@@ -58,6 +62,9 @@ Local-first Go CLI + TUI that renders OpenTelemetry trace waterfalls for shell c
 All 7 subcommands live (run/mark/serve/show/list/diff/tui), OTLP receiver, interactive TUI,
 secret redaction on ingest, cross-compiled static binaries, README, and three adapters:
 `cargo`, `go-test`, `junit`. See IMPLEMENTATION-ROADMAP.md and HANDOFF.md.
+
+P08 Trace Redaction Preview is the only reactivated post-v1 increment in this
+worktree. Its source-level command is not a claim about the v1.8.3 release.
 
 ## Stack
 
