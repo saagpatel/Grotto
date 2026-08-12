@@ -29,6 +29,10 @@ reports. The OTLP receiver, interactive TUI, ingest redaction, static binaries, 
 three adapters (`cargo`, `go-test`, `junit`) remain intact. See
 IMPLEMENTATION-ROADMAP.md, P06-COMPACTION-XRAY-DESIGN.md, and HANDOFF.md.
 
+**Active additive increment:** P08 adds an eighth source-level command,
+`redact-preview`, plus a versioned canonical ingest/preview evaluator. This is
+branch state until merged and is not part of the v1.8.3 public binary.
+
 ## Key Decisions
 | Decision | Choice | Why |
 |----------|--------|-----|
@@ -62,6 +66,9 @@ The seven released subcommands remain run/mark/serve/show/list/diff/tui. P06 add
 The OTLP receiver, interactive TUI, ingest redaction, static binaries, and three
 adapters (`cargo`, `go-test`, `junit`) remain intact. See IMPLEMENTATION-ROADMAP.md,
 P06-COMPACTION-XRAY-DESIGN.md, and HANDOFF.md.
+
+P08 Trace Redaction Preview is the only reactivated post-v1 increment in this
+worktree. Its source-level command is not a claim about the v1.8.3 release.
 
 ## Stack
 

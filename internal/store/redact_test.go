@@ -1,6 +1,10 @@
 package store
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -10,9 +14,6 @@ import (
 	"github.com/saagpatel/grotto/internal/model"
 )
 
-// Test credentials are built from a prefix + repeated filler at runtime so no
-// full credential pattern appears as a literal in source (which would trip
-// secret scanners) while still exercising each redaction regex.
 var (
 	awsKey    = "AKIA" + strings.Repeat("Q", 16)
 	githubPAT = "ghp_" + strings.Repeat("a", 36)
@@ -20,28 +21,27 @@ var (
 	slackTok  = "xoxb-" + strings.Repeat("1", 24)
 )
 
-func TestRedactString_AllFourPatterns(t *testing.T) {
-	for _, s := range []string{awsKey, githubPAT, openAIKey, slackTok} {
-		got := redactString(s)
-		assert.Equalf(t, redactionMask, got, "secret %q must be fully masked", s)
-		assert.NotContainsf(t, got, s, "raw secret %q must not survive", s)
+func TestRedact_LegacyCredentialRegression(t *testing.T) {
+	for _, secret := range []string{awsKey, githubPAT, openAIKey, slackTok} {
+		original := model.Trace{
+			RunLabel: "deploy with " + secret,
+			Spans: []model.Span{{
+				Name:       "auth " + secret,
+				Attributes: []model.Attribute{{Key: "note", ValueType: "str", Value: secret}},
+			}},
+		}
+		got, err := Redact(original)
+		require.NoError(t, err)
+		assert.NotContains(t, got.RunLabel, secret)
+		assert.Contains(t, got.RunLabel, "‹redacted›")
+		assert.NotContains(t, got.Spans[0].Name, secret)
+		assert.Equal(t, "‹redacted›", got.Spans[0].Attributes[0].Value)
+		assert.Equal(t, "deploy with "+secret, original.RunLabel, "input must not be mutated")
 	}
 }
 
-func TestRedactString_MasksEmbeddedSecretAndKeepsContext(t *testing.T) {
-	got := redactString("deploy with " + awsKey + " then exit")
-	assert.Equal(t, "deploy with "+redactionMask+" then exit", got)
-}
-
-func TestRedactString_LeavesOrdinaryTextUntouched(t *testing.T) {
-	for _, s := range []string{"make all", "go test ./...", "compile", "sk-too-short", ""} {
-		assert.Equal(t, s, redactString(s), "non-secret text must pass through unchanged")
-	}
-}
-
-func TestInsertTrace_RedactsBeforePersisting(t *testing.T) {
+func TestInsertTrace_UsesCanonicalEvaluatorBeforePersisting(t *testing.T) {
 	st, ctx := newTestStore(t)
-
 	tr := model.Trace{
 		TraceID: "redact-1", RunLabel: "push " + githubPAT, Source: "mark", RootName: "push",
 		StartedNs: 0, EndedNs: 100, DurationNs: 100, SpanCount: 1,
@@ -49,40 +49,60 @@ func TestInsertTrace_RedactsBeforePersisting(t *testing.T) {
 			SpanID: "s1", TraceID: "redact-1", Name: "auth " + githubPAT,
 			Kind: model.KindInternal, Status: model.StatusOk,
 			StartedNs: 0, EndedNs: 100, DurationNs: 100,
-			Attributes: []model.Attribute{{Key: "token", ValueType: "str", Value: githubPAT}},
+			Attributes: []model.Attribute{
+				{Key: "authorization", ValueType: "str", Value: "Bearer fake-never-real-token"},
+				{Key: "gen_ai.input.messages", ValueType: "json", Value: `[{"role":"user","content":"fake private prompt"}]`},
+			},
 		}},
 	}
 	require.NoError(t, st.InsertTrace(ctx, tr))
-
 	got, err := st.GetTrace(ctx, "redact-1")
 	require.NoError(t, err)
-
-	assert.NotContains(t, got.RunLabel, githubPAT, "run label must be redacted on disk")
-	assert.Contains(t, got.RunLabel, redactionMask)
-	assert.NotContains(t, got.Spans[0].Name, githubPAT, "span name must be redacted on disk")
-	assert.Equal(t, redactionMask, got.Spans[0].Attributes[0].Value, "attribute value must be redacted on disk")
+	assert.NotContains(t, got.RunLabel, githubPAT)
+	require.Len(t, got.Spans[0].Attributes, 1, "GenAI content must be dropped at ingest")
+	assert.Equal(t, "authorization", got.Spans[0].Attributes[0].Key)
+	assert.NotContains(t, got.Spans[0].Attributes[0].Value, "fake-never-real-token")
 }
 
-func TestRedact_DoesNotMutateInput(t *testing.T) {
-	orig := model.Trace{
-		RunLabel: awsKey,
-		Spans:    []model.Span{{Name: awsKey, Attributes: []model.Attribute{{Key: "k", Value: awsKey}}}},
-	}
-	_ = Redact(orig)
+func TestOpenReadOnly_DoesNotChangeDatabaseOrCreateSidecars(t *testing.T) {
+	ctx := t.Context()
+	path := filepath.Join(t.TempDir(), "preview.db")
+	st, err := Open(ctx, path)
+	require.NoError(t, err)
+	require.NoError(t, st.InsertTrace(ctx, minimalTrace("read-only", "fixture", 1)))
+	require.NoError(t, st.Close())
 
-	// Redact must return a copy; the caller's trace is left intact.
-	assert.Equal(t, awsKey, orig.RunLabel)
-	assert.Equal(t, awsKey, orig.Spans[0].Name)
-	assert.Equal(t, awsKey, orig.Spans[0].Attributes[0].Value)
+	before := fileDigest(t, path)
+	beforeSidecars, err := filepath.Glob(path + "-*")
+	require.NoError(t, err)
+	ro, err := OpenReadOnly(ctx, path)
+	require.NoError(t, err)
+	_, err = ro.GetTrace(ctx, "read-only")
+	require.NoError(t, err)
+	require.NoError(t, ro.Close())
+
+	assert.Equal(t, before, fileDigest(t, path))
+	afterSidecars, err := filepath.Glob(path + "-*")
+	require.NoError(t, err)
+	assert.Equal(t, beforeSidecars, afterSidecars)
+}
+
+func fileDigest(t *testing.T, path string) string {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	require.NoError(t, err)
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:])
 }
 
 func TestRedact_MasksLinkAttributeValuesWithoutMutatingInput(t *testing.T) {
 	orig := model.Trace{Spans: []model.Span{{Links: []model.SpanLink{{
 		TraceID: "trace", SpanID: "span",
-		Attributes: []model.Attribute{{Key: "token", Value: githubPAT}},
+		Attributes: []model.Attribute{{Key: "token", ValueType: "str", Value: githubPAT}},
 	}}}}}
-	got := Redact(orig)
+	got, err := Redact(orig)
+	require.NoError(t, err)
 
-	assert.Equal(t, redactionMask, got.Spans[0].Links[0].Attributes[0].Value)
+	assert.Equal(t, "‹redacted›", got.Spans[0].Links[0].Attributes[0].Value)
 	assert.Equal(t, githubPAT, orig.Spans[0].Links[0].Attributes[0].Value)
 }

@@ -70,6 +70,9 @@ func TestMapAttribute_Types(t *testing.T) {
 	got := mapAttribute(empty)
 	assert.Equal(t, "missing", got.Key)
 	assert.Equal(t, "str", got.ValueType, "an empty value falls back to str")
+
+	binary := &commonpb.KeyValue{Key: "payload", Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_BytesValue{BytesValue: []byte{0, 1, 255}}}}
+	assert.Equal(t, model.Attribute{Key: "payload", ValueType: "bytes", Value: "0001ff"}, mapAttribute(binary))
 }
 
 func TestMapExportRequest_Empty(t *testing.T) {

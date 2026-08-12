@@ -6,6 +6,19 @@ GitHub releases are tagged, and `v1.8.3` is the latest public release with macOS
 arm64 and Linux amd64 binaries plus checksums. The downloaded release binary reports
 `grotto v1.8.3`.
 
+## Active Increment — P08 Trace Redaction Preview
+
+Branch `codex/p08-trace-redaction-preview` adds a local dry-run disclosure plan
+for imported and stored traces. `grotto redact-preview` and `InsertTrace` share
+the embedded Policy V1 evaluator; preview uses raw-content-off reports and a
+read-only immutable SQLite path. Policy/report schemas, synthetic fixtures,
+privacy guidance, and the five-minute demo are linked from the README. P06
+compaction visualization and P09 token/cache ledgers remain sibling-owned.
+
+This section describes branch state, not public v1.8.3 runtime uptake or a new
+release. See `docs/design/phase-p08-trace-redaction-preview.md` for the exact
+contract and current official-source evidence boundary.
+
 ## Shipped This Session (2026-06-06) — v1.3 -> v1.8
 - **v1.4.0** — the cargo build adapter (`grotto run --adapter=cargo` -> per-crate
   waterfall from cargo's stable `--timings` `UNIT_DATA`; rollup bucket, `--limit`,

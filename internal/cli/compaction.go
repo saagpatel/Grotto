@@ -46,7 +46,10 @@ func newCompactionCmd() *cobra.Command {
 				}
 				// Direct fixture imports bypass InsertTrace, so apply the same
 				// ingest redaction before any normalization or rendering.
-				trace = store.Redact(trace)
+				trace, err = store.Redact(trace)
+				if err != nil {
+					return fmt.Errorf("redact OTLP fixture: %w", err)
+				}
 			} else {
 				st, err := openStore(ctx)
 				if err != nil {

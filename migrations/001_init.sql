@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS spans (
 CREATE TABLE IF NOT EXISTS span_attributes (
     span_id    TEXT NOT NULL REFERENCES spans(span_id) ON DELETE CASCADE,
     key        TEXT NOT NULL,
-    value_type TEXT NOT NULL,             -- 'str'|'int'|'float'|'bool'
+    value_type TEXT NOT NULL,             -- 'str'|'int'|'float'|'bool'|'bytes'|'json'
     value      TEXT NOT NULL,
     PRIMARY KEY (span_id, key)
 );

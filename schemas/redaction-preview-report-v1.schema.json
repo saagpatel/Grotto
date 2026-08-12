@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/saagpatel/Grotto/schemas/redaction-preview-report-v1.schema.json",
+  "title": "Grotto Redaction Preview Report V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "policy", "source", "summary", "decisions"],
+  "properties": {
+    "schema": {"const": "grotto.redaction-preview.v1"},
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_id", "policy_version", "policy_sha256", "evaluator_version"],
+      "properties": {
+        "policy_id": {"type": "string"},
+        "policy_version": {"type": "string"},
+        "policy_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "evaluator_version": {"type": "string"}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref", "trace_id"],
+      "properties": {
+        "kind": {"type": "string"},
+        "ref": {"type": "string"},
+        "trace_id": {"type": "string"}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fields", "retained", "masked", "hashed", "truncated", "dropped", "unknown"],
+      "properties": {
+        "fields": {"type": "integer", "minimum": 0},
+        "retained": {"type": "integer", "minimum": 0},
+        "masked": {"type": "integer", "minimum": 0},
+        "hashed": {"type": "integer", "minimum": 0},
+        "truncated": {"type": "integer", "minimum": 0},
+        "dropped": {"type": "integer", "minimum": 0},
+        "unknown": {"type": "integer", "minimum": 0}
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "category", "matched_rule", "rule_provenance", "action", "explanation", "precedence", "original_type", "original_length_bytes", "status"],
+        "properties": {
+          "path": {"type": "string"},
+          "category": {"type": "string"},
+          "matched_rule": {"type": "string"},
+          "rule_provenance": {"type": "string"},
+          "action": {"enum": ["retain", "mask", "hash", "truncate", "drop"]},
+          "explanation": {"type": "string"},
+          "precedence": {"type": "string"},
+          "original_type": {"type": "string"},
+          "original_length_bytes": {"type": "integer", "minimum": 0},
+          "preview": {"type": "string"},
+          "digest": {"type": "string", "pattern": "^sha256:v1:[a-f0-9]{64}$"},
+          "status": {"enum": ["known", "unknown"]},
+          "unknown_reason": {"type": "string"}
+        }
+      }
+    }
+  }
+}

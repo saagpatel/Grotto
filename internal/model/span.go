@@ -7,6 +7,7 @@ package model
 
 import (
 	"encoding/json"
+	"fmt"
 	"sort"
 )
 
@@ -44,6 +45,40 @@ func (k SpanKind) MarshalJSON() ([]byte, error) {
 	return json.Marshal(k.String())
 }
 
+// UnmarshalJSON accepts the readable labels emitted by MarshalJSON and numeric
+// OTLP enum values for imported Grotto trace files.
+func (k *SpanKind) UnmarshalJSON(data []byte) error {
+	var label string
+	if err := json.Unmarshal(data, &label); err == nil {
+		switch label {
+		case "unspecified":
+			*k = KindUnspecified
+		case "internal":
+			*k = KindInternal
+		case "server":
+			*k = KindServer
+		case "client":
+			*k = KindClient
+		case "producer":
+			*k = KindProducer
+		case "consumer":
+			*k = KindConsumer
+		default:
+			return fmt.Errorf("unknown span kind %q", label)
+		}
+		return nil
+	}
+	var value int32
+	if err := json.Unmarshal(data, &value); err != nil {
+		return fmt.Errorf("decode span kind: %w", err)
+	}
+	if value < int32(KindUnspecified) || value > int32(KindConsumer) {
+		return fmt.Errorf("span kind %d is out of range", value)
+	}
+	*k = SpanKind(value)
+	return nil
+}
+
 // StatusCode mirrors the OpenTelemetry status code enumeration.
 type StatusCode int32
 
@@ -69,9 +104,37 @@ func (s StatusCode) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s.String())
 }
 
+// UnmarshalJSON accepts the readable labels emitted by MarshalJSON and numeric
+// OTLP enum values for imported Grotto trace files.
+func (s *StatusCode) UnmarshalJSON(data []byte) error {
+	var label string
+	if err := json.Unmarshal(data, &label); err == nil {
+		switch label {
+		case "unset":
+			*s = StatusUnset
+		case "ok":
+			*s = StatusOk
+		case "error":
+			*s = StatusError
+		default:
+			return fmt.Errorf("unknown status code %q", label)
+		}
+		return nil
+	}
+	var value int32
+	if err := json.Unmarshal(data, &value); err != nil {
+		return fmt.Errorf("decode status code: %w", err)
+	}
+	if value < int32(StatusUnset) || value > int32(StatusError) {
+		return fmt.Errorf("status code %d is out of range", value)
+	}
+	*s = StatusCode(value)
+	return nil
+}
+
 // Attribute is a single typed key/value pair on a span. Value is stored as a
-// string; type-assert against ValueType ("str"|"int"|"float"|"bool") to recover
-// the original type.
+// string; type-assert against ValueType
+// ("str"|"int"|"float"|"bool"|"bytes"|"json") to recover the original type.
 type Attribute struct {
 	Key       string `json:"key"`
 	ValueType string `json:"value_type"`

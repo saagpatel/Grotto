@@ -237,11 +237,15 @@ func TestAnalyze_RedactionAndRenderingStability(t *testing.T) {
 		strAttr("gen_ai.input.messages", secret),
 		strAttr(attrAnswerLabel, "stable"),
 	)
-	report := Analyze(store.Redact(trace(span)))
+	redacted, err := store.Redact(trace(span))
+	require.NoError(t, err)
+	report := Analyze(redacted)
 
 	var firstJSON, secondJSON, firstText, secondText bytes.Buffer
 	require.NoError(t, WriteJSON(&firstJSON, report))
-	require.NoError(t, WriteJSON(&secondJSON, Analyze(store.Redact(trace(span)))))
+	redactedAgain, err := store.Redact(trace(span))
+	require.NoError(t, err)
+	require.NoError(t, WriteJSON(&secondJSON, Analyze(redactedAgain)))
 	require.NoError(t, WriteText(&firstText, report))
 	require.NoError(t, WriteText(&secondText, report))
 	assert.Equal(t, firstJSON.String(), secondJSON.String())

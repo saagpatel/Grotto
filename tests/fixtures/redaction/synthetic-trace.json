@@ -1,0 +1,38 @@
+{
+  "trace_id": "00000000000000000000000000000008",
+  "run_label": "synthetic redaction preview",
+  "source": "otlp",
+  "root_name": "POST /agent/run",
+  "started_ns": 100,
+  "ended_ns": 200,
+  "duration_ns": 100,
+  "span_count": 1,
+  "spans": [
+    {
+      "span_id": "0000000000000008",
+      "trace_id": "00000000000000000000000000000008",
+      "parent_span_id": "",
+      "name": "invoke_agent",
+      "kind": "client",
+      "status": "ok",
+      "started_ns": 100,
+      "ended_ns": 200,
+      "duration_ns": 100,
+      "attributes": [
+        {"key": "authorization", "value_type": "str", "value": "Bearer test-token-never-real"},
+        {"key": "http.request.header.cookie", "value_type": "str", "value": "session=fake-session-value"},
+        {"key": "user.email", "value_type": "str", "value": "operator@example.test"},
+        {"key": "workspace", "value_type": "str", "value": "/Users/example/grotto-demo"},
+        {"key": "url.full", "value_type": "str", "value": "https://example.test/run?token=fake&mode=demo"},
+        {"key": "gen_ai.input.messages", "value_type": "json", "value": "[{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"Synthetic prompt only\"}]}]"},
+        {"key": "gen_ai.output.messages", "value_type": "json", "value": "[{\"role\":\"assistant\",\"parts\":[{\"type\":\"text\",\"content\":\"Synthetic completion only\"}]}]"},
+        {"key": "gen_ai.tool.call.arguments", "value_type": "json", "value": "{\"city\":\"Exampleville\"}"},
+        {"key": "gen_ai.tool.call.result", "value_type": "json", "value": "{\"forecast\":\"synthetic rain\"}"},
+        {"key": "exception.message", "value_type": "str", "value": "Synthetic exception message with no real customer data"},
+        {"key": "payload", "value_type": "json", "value": "{\"nested\":{\"authorization\":\"Bearer fake-nested-token\",\"safe\":\"fixture\"}}"},
+        {"key": "binary.payload", "value_type": "bytes", "value": "00010203aabbccdd"},
+        {"key": "custom.safe", "value_type": "str", "value": "fixture metadata"}
+      ]
+    }
+  ]
+}
