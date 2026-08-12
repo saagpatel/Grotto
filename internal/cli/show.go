@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/saagpatel/grotto/internal/adapter"
+	"github.com/saagpatel/grotto/internal/ledger"
 	"github.com/saagpatel/grotto/internal/model"
 	"github.com/saagpatel/grotto/internal/render"
 )
@@ -17,11 +18,17 @@ func newShowCmd() *cobra.Command {
 	var limit int
 	var criticalPath bool
 	var sections bool
+	var asLedger bool
+	var asLedgerJSON bool
+	var ledgerRates string
 	cmd := &cobra.Command{
 		Use:   "show <trace-id>",
 		Short: "Print a static waterfall for a stored trace",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if ledgerRates != "" && !asLedger && !asLedgerJSON {
+				return fmt.Errorf("show: --ledger-rates requires --ledger or --ledger-json")
+			}
 			ctx := cmd.Context()
 			st, err := openStore(ctx)
 			if err != nil {
@@ -35,6 +42,20 @@ func newShowCmd() *cobra.Command {
 			}
 			if asJSON {
 				return render.WriteJSON(cmd.OutOrStdout(), tr)
+			}
+			if asLedger || asLedgerJSON {
+				report := ledger.Build(tr)
+				if ledgerRates != "" {
+					book, loadErr := ledger.LoadRates(ledgerRates)
+					if loadErr != nil {
+						return fmt.Errorf("show: %w", loadErr)
+					}
+					ledger.ApplyRates(&report, book)
+				}
+				if asLedgerJSON {
+					return ledger.WriteJSON(cmd.OutOrStdout(), report)
+				}
+				return ledger.WriteText(cmd.OutOrStdout(), report)
 			}
 			if criticalPath {
 				return render.WriteCriticalPath(cmd.OutOrStdout(), tr)
@@ -54,9 +75,17 @@ func newShowCmd() *cobra.Command {
 		"show the longest dependency chain (build floor) instead of the waterfall; cargo-adapter traces only")
 	cmd.Flags().BoolVar(&sections, "sections", false,
 		"show cargo per-crate frontend/codegen sub-phases nested under each crate")
+	cmd.Flags().BoolVar(&asLedger, "ledger", false,
+		"show a causal token, cache, tool, and context ledger")
+	cmd.Flags().BoolVar(&asLedgerJSON, "ledger-json", false,
+		"output the versioned cache/context ledger report as JSON")
+	cmd.Flags().StringVar(&ledgerRates, "ledger-rates", "",
+		"local versioned user-supplied rate file for optional estimates")
 	// These select different renderings; combining them would silently pick one.
-	cmd.MarkFlagsMutuallyExclusive("json", "critical-path")
+	cmd.MarkFlagsMutuallyExclusive("json", "critical-path", "ledger", "ledger-json")
 	cmd.MarkFlagsMutuallyExclusive("critical-path", "sections")
+	cmd.MarkFlagsMutuallyExclusive("ledger", "sections")
+	cmd.MarkFlagsMutuallyExclusive("ledger-json", "sections")
 	return cmd
 }
 

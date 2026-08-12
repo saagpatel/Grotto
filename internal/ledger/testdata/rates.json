@@ -1,0 +1,28 @@
+{
+  "schema": "grotto.token_rates.v1",
+  "as_of": "2026-08-11",
+  "currency": "USD",
+  "rates": [
+    {
+      "provider": "openai",
+      "model": "gpt-fixture",
+      "per_million_tokens": {
+        "input": "2",
+        "output": "4",
+        "cache_read_input": "1",
+        "cache_write_input": "2",
+        "reasoning_output": "5"
+      }
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-fixture",
+      "per_million_tokens": {
+        "input": "3",
+        "output": "6",
+        "cache_read_input": "0.5",
+        "cache_write_input": "3.75"
+      }
+    }
+  ]
+}

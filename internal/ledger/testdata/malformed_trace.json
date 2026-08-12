@@ -1,0 +1,33 @@
+{
+  "trace_id": "09999999999999999999999999999999",
+  "run_label": "p09 malformed cases",
+  "source": "otlp",
+  "root_name": "malformed",
+  "started_ns": 0,
+  "ended_ns": 100,
+  "duration_ns": 100,
+  "span_count": 4,
+  "spans": [
+    {
+      "span_id": "bad-conflict", "trace_id": "09999999999999999999999999999999", "parent_span_id": "bad-root", "name": "conflicting totals", "started_ns": 20, "ended_ns": 30, "duration_ns": 10,
+      "attributes": [
+        {"key": "gen_ai.provider.name", "value_type": "str", "value": "openai"},
+        {"key": "gen_ai.usage.input_tokens", "value_type": "int", "value": "10"},
+        {"key": "openai.usage.input_tokens", "value_type": "int", "value": "11"},
+        {"key": "gen_ai.usage.output_tokens", "value_type": "int", "value": "2"}
+      ]
+    },
+    {
+      "span_id": "bad-overflow", "trace_id": "09999999999999999999999999999999", "parent_span_id": "bad-root", "name": "overflow", "started_ns": 40, "ended_ns": 50, "duration_ns": 10,
+      "attributes": [
+        {"key": "gen_ai.usage.input_tokens", "value_type": "int", "value": "9223372036854775807"},
+        {"key": "gen_ai.usage.output_tokens", "value_type": "int", "value": "1"}
+      ]
+    },
+    {"span_id": "bad-root", "trace_id": "09999999999999999999999999999999", "parent_span_id": "", "name": "malformed", "started_ns": 0, "ended_ns": 100, "duration_ns": 100},
+    {
+      "span_id": "bad-negative", "trace_id": "09999999999999999999999999999999", "parent_span_id": "bad-root", "name": "negative", "started_ns": 10, "ended_ns": 15, "duration_ns": 5,
+      "attributes": [{"key": "gen_ai.usage.input_tokens", "value_type": "int", "value": "-1"}]
+    }
+  ]
+}

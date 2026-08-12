@@ -277,3 +277,27 @@ brew install otel-cli                        # optional, Phase 2 receiver testin
 - Rationale: diff + list are independent query commands; README has no code dependency.
 - worktree note: push the Phase 3 branch first, or set `worktree.baseRef: "head"` before dispatch.
 **Phase-end review:** Run `/ultrareview`. Address all findings before marking the phase complete.
+
+---
+
+## Phase P09: Cache and Context Ledger (selected 2026-08-11)
+
+**Objective:** Explain input, output, reasoning, cache-read, cache-write, tool,
+and explicitly supplied context-window token signals across an agent trace with
+raw-attribute provenance, deterministic causal aggregation, reconciliation, and
+`UNKNOWN` instead of guesses.
+
+**Ownership:** P09 owns `internal/ledger/**`, its schemas, fixtures, tests, and
+the minimal `grotto show` integration. P06 retains compaction visualization;
+P08 retains redaction preview. All paths continue through genuine OTel spans,
+the existing SQLite store, and existing renderer/CLI architecture.
+
+**Locked constraints:** no provider calls, no baked or browsed runtime prices,
+no cgo, no alternate trace store, and no double counting of cache/reasoning
+subsets. Monetary estimates require an explicit versioned user rate file with
+as-of provenance.
+
+**Design and acceptance:** See
+[`P09-CACHE-CONTEXT-LEDGER-DESIGN.md`](P09-CACHE-CONTEXT-LEDGER-DESIGN.md).
+The phase ends only when the synthetic OTel fixture deterministically reconciles
+known totals back to exact source attributes and the full repository gates pass.

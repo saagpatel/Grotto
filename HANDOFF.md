@@ -80,3 +80,14 @@ from only release assets plus a shallow `v1.8.3` clone.
 
 ## Next Candidates
 1. Consider a short recorded GIF only if motion would make the public demo clearer.
+
+## Active Additive Increment — P09 Cache and Context Ledger
+
+P09 was selected on 2026-08-11 in the isolated
+`codex/p09-cache-context-ledger` worktree. Its contract is
+[`P09-CACHE-CONTEXT-LEDGER-DESIGN.md`](P09-CACHE-CONTEXT-LEDGER-DESIGN.md): a
+provider-neutral causal token/cache/context ledger over existing stored OTel
+spans, exposed through `grotto show --ledger` and `--ledger-json`. P06 retains
+compaction visualization and P08 retains redaction preview. P09 adds neither a
+provider client nor built-in prices; optional estimates require an explicit
+versioned local rate file with as-of provenance.

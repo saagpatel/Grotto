@@ -1,0 +1,117 @@
+{
+  "trace_id": "09090909090909090909090909090909",
+  "run_label": "p09 synthetic agent",
+  "source": "otlp",
+  "root_name": "invoke agent",
+  "started_ns": 0,
+  "ended_ns": 1000,
+  "duration_ns": 1000,
+  "span_count": 11,
+  "spans": [
+    {
+      "span_id": "00000000000000a5", "trace_id": "09090909090909090909090909090909", "parent_span_id": "00000000000000a1", "name": "retry inference", "kind": 3, "status": 2, "started_ns": 300, "ended_ns": 350, "duration_ns": 50,
+      "attributes": [
+        {"key": "gen_ai.provider.name", "value_type": "str", "value": "openai"},
+        {"key": "gen_ai.response.model", "value_type": "str", "value": "gpt-fixture"},
+        {"key": "gen_ai.operation.name", "value_type": "str", "value": "chat"},
+        {"key": "openai.usage.input_tokens", "value_type": "int", "value": "30"},
+        {"key": "openai.usage.output_tokens", "value_type": "int", "value": "5"},
+        {"key": "openai.usage.input_tokens_details.cached_tokens", "value_type": "int", "value": "0"},
+        {"key": "gen_ai.usage.cache_creation.input_tokens", "value_type": "int", "value": "0"},
+        {"key": "openai.usage.output_tokens_details.reasoning_tokens", "value_type": "int", "value": "0"},
+        {"key": "grotto.usage.tool.input_tokens", "value_type": "int", "value": "0"},
+        {"key": "grotto.retry.logical_call_id", "value_type": "str", "value": "call-a"},
+        {"key": "grotto.retry.attempt", "value_type": "int", "value": "2"}
+      ]
+    },
+    {
+      "span_id": "0000000000000001", "trace_id": "09090909090909090909090909090909", "parent_span_id": "", "name": "invoke agent", "kind": 1, "status": 1, "started_ns": 0, "ended_ns": 1000, "duration_ns": 1000,
+      "attributes": [
+        {"key": "gen_ai.operation.name", "value_type": "str", "value": "invoke_agent"},
+        {"key": "gen_ai.conversation.compacted", "value_type": "bool", "value": "true"},
+        {"key": "grotto.usage.mode", "value_type": "str", "value": "rollup"},
+        {"key": "gen_ai.usage.input_tokens", "value_type": "int", "value": "330"},
+        {"key": "gen_ai.usage.output_tokens", "value_type": "int", "value": "92"},
+        {"key": "gen_ai.usage.cache_read.input_tokens", "value_type": "int", "value": "100"},
+        {"key": "gen_ai.usage.cache_creation.input_tokens", "value_type": "int", "value": "25"},
+        {"key": "gen_ai.usage.reasoning.output_tokens", "value_type": "int", "value": "10"},
+        {"key": "grotto.usage.tool.input_tokens", "value_type": "int", "value": "20"},
+        {"key": "grotto.context.window.limit_tokens", "value_type": "int", "value": "1000"}
+      ]
+    },
+    {
+      "span_id": "00000000000000c2", "trace_id": "09090909090909090909090909090909", "parent_span_id": "00000000000000c0", "name": "cumulative sample 2", "kind": 3, "status": 1, "started_ns": 500, "ended_ns": 510, "duration_ns": 10,
+      "attributes": [
+        {"key": "gen_ai.provider.name", "value_type": "str", "value": "openai"},
+        {"key": "gen_ai.response.model", "value_type": "str", "value": "gpt-fixture"},
+        {"key": "grotto.usage.mode", "value_type": "str", "value": "cumulative"},
+        {"key": "grotto.usage.series", "value_type": "str", "value": "stream-c"},
+        {"key": "gen_ai.usage.input_tokens", "value_type": "int", "value": "25"},
+        {"key": "gen_ai.usage.output_tokens", "value_type": "int", "value": "12"},
+        {"key": "gen_ai.usage.cache_read.input_tokens", "value_type": "int", "value": "0"},
+        {"key": "gen_ai.usage.cache_creation.input_tokens", "value_type": "int", "value": "0"},
+        {"key": "gen_ai.usage.reasoning.output_tokens", "value_type": "int", "value": "0"},
+        {"key": "grotto.usage.tool.input_tokens", "value_type": "int", "value": "0"}
+      ]
+    },
+    {"span_id": "00000000000000b1", "trace_id": "09090909090909090909090909090909", "parent_span_id": "0000000000000001", "name": "parallel branch b", "kind": 1, "status": 1, "started_ns": 20, "ended_ns": 600, "duration_ns": 580},
+    {
+      "span_id": "00000000000000a2", "trace_id": "09090909090909090909090909090909", "parent_span_id": "00000000000000a1", "name": "uncached inference", "kind": 3, "status": 1, "started_ns": 100, "ended_ns": 200, "duration_ns": 100,
+      "attributes": [
+        {"key": "gen_ai.provider.name", "value_type": "str", "value": "openai"},
+        {"key": "gen_ai.response.model", "value_type": "str", "value": "gpt-fixture"},
+        {"key": "gen_ai.operation.name", "value_type": "str", "value": "chat"},
+        {"key": "gen_ai.usage.input_tokens", "value_type": "int", "value": "100"},
+        {"key": "gen_ai.usage.output_tokens", "value_type": "int", "value": "40"},
+        {"key": "gen_ai.usage.cache_read.input_tokens", "value_type": "int", "value": "0"},
+        {"key": "gen_ai.usage.cache_creation.input_tokens", "value_type": "int", "value": "0"},
+        {"key": "gen_ai.usage.reasoning.output_tokens", "value_type": "int", "value": "10"},
+        {"key": "grotto.usage.tool.input_tokens", "value_type": "int", "value": "20"},
+        {"key": "grotto.retry.logical_call_id", "value_type": "str", "value": "call-a"},
+        {"key": "grotto.retry.attempt", "value_type": "int", "value": "1"}
+      ]
+    },
+    {
+      "span_id": "00000000000000a3", "trace_id": "09090909090909090909090909090909", "parent_span_id": "00000000000000a1", "name": "execute weather", "kind": 1, "status": 1, "started_ns": 210, "ended_ns": 230, "duration_ns": 20,
+      "attributes": [
+        {"key": "gen_ai.operation.name", "value_type": "str", "value": "execute_tool"},
+        {"key": "gen_ai.tool.name", "value_type": "str", "value": "weather"}
+      ]
+    },
+    {"span_id": "00000000000000c0", "trace_id": "09090909090909090909090909090909", "parent_span_id": "0000000000000001", "name": "parallel branch c", "kind": 1, "status": 1, "started_ns": 30, "ended_ns": 700, "duration_ns": 670},
+    {
+      "span_id": "00000000000000b2", "trace_id": "09090909090909090909090909090909", "parent_span_id": "00000000000000b1", "name": "cache hit and write", "kind": 3, "status": 1, "started_ns": 150, "ended_ns": 250, "duration_ns": 100,
+      "attributes": [
+        {"key": "gen_ai.provider.name", "value_type": "str", "value": "anthropic"},
+        {"key": "gen_ai.response.model", "value_type": "str", "value": "claude-fixture"},
+        {"key": "gen_ai.operation.name", "value_type": "str", "value": "chat"},
+        {"key": "anthropic.usage.input_tokens", "value_type": "int", "value": "50"},
+        {"key": "anthropic.usage.output_tokens", "value_type": "int", "value": "35"},
+        {"key": "anthropic.usage.cache_read_input_tokens", "value_type": "int", "value": "100"},
+        {"key": "anthropic.usage.cache_creation_input_tokens", "value_type": "int", "value": "25"},
+        {"key": "gen_ai.usage.reasoning.output_tokens", "value_type": "int", "value": "0"},
+        {"key": "grotto.usage.tool.input_tokens", "value_type": "int", "value": "0"}
+      ]
+    },
+    {
+      "span_id": "00000000000000a4", "trace_id": "09090909090909090909090909090909", "parent_span_id": "00000000000000a1", "name": "compaction adjacent", "kind": 1, "status": 1, "started_ns": 260, "ended_ns": 270, "duration_ns": 10,
+      "attributes": [{"key": "gen_ai.conversation.compacted", "value_type": "bool", "value": "true"}]
+    },
+    {"span_id": "00000000000000a1", "trace_id": "09090909090909090909090909090909", "parent_span_id": "0000000000000001", "name": "parallel branch a", "kind": 1, "status": 1, "started_ns": 10, "ended_ns": 500, "duration_ns": 490},
+    {
+      "span_id": "00000000000000c1", "trace_id": "09090909090909090909090909090909", "parent_span_id": "00000000000000c0", "name": "cumulative sample 1", "kind": 3, "status": 1, "started_ns": 400, "ended_ns": 410, "duration_ns": 10,
+      "attributes": [
+        {"key": "gen_ai.provider.name", "value_type": "str", "value": "openai"},
+        {"key": "gen_ai.response.model", "value_type": "str", "value": "gpt-fixture"},
+        {"key": "grotto.usage.mode", "value_type": "str", "value": "cumulative"},
+        {"key": "grotto.usage.series", "value_type": "str", "value": "stream-c"},
+        {"key": "gen_ai.usage.input_tokens", "value_type": "int", "value": "20"},
+        {"key": "gen_ai.usage.output_tokens", "value_type": "int", "value": "10"},
+        {"key": "gen_ai.usage.cache_read.input_tokens", "value_type": "int", "value": "0"},
+        {"key": "gen_ai.usage.cache_creation.input_tokens", "value_type": "int", "value": "0"},
+        {"key": "gen_ai.usage.reasoning.output_tokens", "value_type": "int", "value": "0"},
+        {"key": "grotto.usage.tool.input_tokens", "value_type": "int", "value": "0"}
+      ]
+    }
+  ]
+}
