@@ -75,3 +75,14 @@ func TestRedact_DoesNotMutateInput(t *testing.T) {
 	assert.Equal(t, awsKey, orig.Spans[0].Name)
 	assert.Equal(t, awsKey, orig.Spans[0].Attributes[0].Value)
 }
+
+func TestRedact_MasksLinkAttributeValuesWithoutMutatingInput(t *testing.T) {
+	orig := model.Trace{Spans: []model.Span{{Links: []model.SpanLink{{
+		TraceID: "trace", SpanID: "span",
+		Attributes: []model.Attribute{{Key: "token", Value: githubPAT}},
+	}}}}}
+	got := Redact(orig)
+
+	assert.Equal(t, redactionMask, got.Spans[0].Links[0].Attributes[0].Value)
+	assert.Equal(t, githubPAT, orig.Spans[0].Links[0].Attributes[0].Value)
+}

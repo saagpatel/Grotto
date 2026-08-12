@@ -54,6 +54,21 @@ func Redact(t model.Trace) model.Trace {
 			}
 			sp.Attributes = attrs
 		}
+		if len(sp.Links) > 0 {
+			links := make([]model.SpanLink, len(sp.Links))
+			for j, link := range sp.Links {
+				if len(link.Attributes) > 0 {
+					attrs := make([]model.Attribute, len(link.Attributes))
+					for k, a := range link.Attributes {
+						a.Value = redactString(a.Value)
+						attrs[k] = a
+					}
+					link.Attributes = attrs
+				}
+				links[j] = link
+			}
+			sp.Links = links
+		}
 		spans[i] = sp
 	}
 	t.Spans = spans

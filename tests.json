@@ -79,6 +79,26 @@
 			]
 		}
 	],
+	"additive_phases": {
+		"P06": [
+			{
+				"test": "compaction: deterministic normalization and ordering for no, one, repeated, branched, broken, and out-of-order response chains",
+				"status": "passing"
+			},
+			{
+				"test": "compaction: UNKNOWN token/reset semantics, supplied-only drift indicators, truncation, provider extensions, and conflicting ancestry",
+				"status": "passing"
+			},
+			{
+				"test": "otlp/store: genuine span links and dropped counts map, persist, reload, and redact without mutating input",
+				"status": "passing"
+			},
+			{
+				"test": "cli: OTLP JSON fixture renders stable text and schema-backed v1 JSON; malformed, multi-trace, and URL inputs fail locally without network",
+				"status": "passing"
+			}
+		]
+	},
 	"phases": {
 		"0": [
 			{

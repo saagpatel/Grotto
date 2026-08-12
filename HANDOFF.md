@@ -80,3 +80,17 @@ from only release assets plus a shallow `v1.8.3` clone.
 
 ## Next Candidates
 1. Consider a short recorded GIF only if motion would make the public demo clearer.
+
+## Additive P06 — Compaction X-Ray
+
+P06 is an explicitly authorized increment after the v1.8.3 public baseline. It
+adds `grotto compaction` for deterministic, content-free visualization of OTel
+GenAI compaction boundaries, response ancestry and real span links, boundary-local
+token shifts, structural context resets, missing ancestry, and caller-supplied
+answer fingerprints. It does not call a model or create a general token/cache
+ledger or redaction-preview surface.
+
+The design and standards binding are in `P06-COMPACTION-XRAY-DESIGN.md`; the
+five-minute synthetic demo is `docs/compaction-xray-demo.md`. Public release
+v1.8.3 remains the current tagged binary until a later release is explicitly
+authorized.

@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/saagpatel/grotto/schemas/compaction-report-v1.schema.json",
+  "title": "Grotto Compaction Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "trace_id",
+    "source_span_count",
+    "semantic_conventions",
+    "observations",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema": { "const": "grotto.compaction_report.v1" },
+    "trace_id": { "type": "string" },
+    "source_span_count": { "type": "integer", "minimum": 0 },
+    "semantic_conventions": { "$ref": "#/$defs/standards" },
+    "observations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/observation" }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/warning" }
+    },
+    "claim_ceiling": {
+      "const": "structural indicators only; no semantic-quality claim"
+    }
+  },
+  "$defs": {
+    "standards": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family", "status", "as_of", "commit"],
+      "properties": {
+        "family": { "const": "OpenTelemetry GenAI" },
+        "status": { "const": "development" },
+        "as_of": { "type": "string", "format": "date" },
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+      }
+    },
+    "optional_int": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state"],
+      "properties": {
+        "state": { "enum": ["known", "unknown"] },
+        "value": { "type": "integer" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "state": { "const": "known" } } },
+          "then": { "required": ["value"] },
+          "else": { "not": { "required": ["value"] } }
+        }
+      ]
+    },
+    "token_delta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["before", "after", "delta"],
+      "properties": {
+        "before": { "$ref": "#/$defs/optional_int" },
+        "after": { "$ref": "#/$defs/optional_int" },
+        "delta": { "$ref": "#/$defs/optional_int" }
+      }
+    },
+    "tokens": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input", "output", "input_shift", "output_shift"],
+      "properties": {
+        "input": { "$ref": "#/$defs/optional_int" },
+        "output": { "$ref": "#/$defs/optional_int" },
+        "input_shift": { "$ref": "#/$defs/token_delta" },
+        "output_shift": { "$ref": "#/$defs/token_delta" }
+      }
+    },
+    "chain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "response_id": { "type": "string" },
+        "previous_response_id": { "type": "string" },
+        "linked_span_id": { "type": "string" },
+        "status": {
+          "enum": [
+            "unknown",
+            "root",
+            "linked",
+            "linked_external",
+            "missing_ancestry",
+            "branched",
+            "ambiguous",
+            "conflict"
+          ]
+        }
+      }
+    },
+    "indicator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "reason"],
+      "properties": {
+        "state": { "enum": ["unknown", "detected", "not_detected"] },
+        "reason": { "type": "string" }
+      }
+    },
+    "drift": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "note"],
+      "properties": {
+        "state": { "enum": ["unknown", "changed", "unchanged"] },
+        "kind": { "enum": ["label", "hash", "fingerprint"] },
+        "note": { "type": "string" }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signal", "source", "field"],
+      "properties": {
+        "signal": { "type": "string" },
+        "source": {
+          "enum": ["otel_semantic_attribute", "otel_span_link", "provider_adapter", "synthetic_attribute"]
+        },
+        "field": { "type": "string" },
+        "experimental": { "type": "boolean" }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "span_id",
+        "started_ns",
+        "chain",
+        "compaction",
+        "tokens",
+        "context_reset",
+        "answer_drift"
+      ],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 1 },
+        "span_id": { "type": "string" },
+        "started_ns": { "type": "integer" },
+        "operation": { "type": "string" },
+        "provider": { "type": "string" },
+        "conversation_id": { "type": "string" },
+        "chain": { "$ref": "#/$defs/chain" },
+        "compaction": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "armed"],
+          "properties": {
+            "state": { "enum": ["unknown", "detected"] },
+            "armed": { "type": "boolean" }
+          }
+        },
+        "tokens": { "$ref": "#/$defs/tokens" },
+        "context_reset": { "$ref": "#/$defs/indicator" },
+        "answer_drift": { "$ref": "#/$defs/drift" },
+        "provenance": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/provenance" }
+        }
+      }
+    },
+    "warning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string" },
+        "span_id": { "type": "string" },
+        "message": { "type": "string" }
+      }
+    }
+  }
+}

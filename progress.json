@@ -84,6 +84,30 @@
 			]
 		}
 	],
+	"additive_phases": [
+		{
+			"phase": "P06",
+			"name": "Compaction X-Ray",
+			"status": "done",
+			"tasks": [
+				{
+					"id": "P06.1",
+					"name": "versioned provider-neutral compaction observation and report contract",
+					"status": "done"
+				},
+				{
+					"id": "P06.2",
+					"name": "genuine OTLP span-link import and local CLI timeline rendering",
+					"status": "done"
+				},
+				{
+					"id": "P06.3",
+					"name": "deterministic fixture matrix, malformed-input coverage, and five-minute demo",
+					"status": "done"
+				}
+			]
+		}
+	],
 	"phases": [
 		{
 			"phase": 0,

@@ -22,13 +22,29 @@ const insertAttrSQL = `
 INSERT INTO span_attributes (span_id, key, value_type, value)
 VALUES (?, ?, ?, ?)`
 
+const insertSpanDiagnosticsSQL = `
+INSERT INTO span_diagnostics (span_id, dropped_attributes_count, dropped_links_count)
+VALUES (?, ?, ?)`
+
+const insertSpanLinkSQL = `
+INSERT INTO span_links (span_id, link_index, trace_id, linked_span_id, trace_state, dropped_attributes_count, flags)
+VALUES (?, ?, ?, ?, ?, ?, ?)`
+
+const insertSpanLinkAttrSQL = `
+INSERT INTO span_link_attributes (span_id, link_index, key, value_type, value)
+VALUES (?, ?, ?, ?, ?)`
+
 const selectTraceSQL = `
 SELECT trace_id, run_label, source, root_name, started_ns, ended_ns, duration_ns, span_count
 FROM traces WHERE trace_id = ?`
 
 const selectSpansSQL = `
-SELECT span_id, parent_span_id, name, kind, status_code, started_ns, ended_ns, duration_ns
-FROM spans WHERE trace_id = ? ORDER BY started_ns`
+SELECT s.span_id, s.parent_span_id, s.name, s.kind, s.status_code,
+       s.started_ns, s.ended_ns, s.duration_ns,
+       COALESCE(d.dropped_attributes_count, 0), COALESCE(d.dropped_links_count, 0)
+FROM spans s
+LEFT JOIN span_diagnostics d ON d.span_id = s.span_id
+WHERE s.trace_id = ? ORDER BY s.started_ns, s.span_id`
 
 const selectAttrsSQL = `
 SELECT a.span_id, a.key, a.value_type, a.value
@@ -36,6 +52,21 @@ FROM span_attributes a
 JOIN spans s ON s.span_id = a.span_id
 WHERE s.trace_id = ?
 ORDER BY a.span_id, a.key`
+
+const selectLinksSQL = `
+SELECT l.span_id, l.link_index, l.trace_id, l.linked_span_id, l.trace_state,
+       l.dropped_attributes_count, l.flags
+FROM span_links l
+JOIN spans s ON s.span_id = l.span_id
+WHERE s.trace_id = ?
+ORDER BY l.span_id, l.link_index`
+
+const selectLinkAttrsSQL = `
+SELECT a.span_id, a.link_index, a.key, a.value_type, a.value
+FROM span_link_attributes a
+JOIN spans s ON s.span_id = a.span_id
+WHERE s.trace_id = ?
+ORDER BY a.span_id, a.link_index, a.key`
 
 const selectRecentTracesSQL = `
 SELECT trace_id, run_label, source, root_name, started_ns, duration_ns, span_count, created_at
@@ -88,6 +119,23 @@ func (s *Store) InsertTrace(ctx context.Context, t model.Trace) (err error) {
 				return fmt.Errorf("insert attr %q/%q: %w", sp.SpanID, a.Key, err)
 			}
 		}
+		if _, err = tx.ExecContext(ctx, insertSpanDiagnosticsSQL,
+			sp.SpanID, sp.DroppedAttributesCount, sp.DroppedLinksCount); err != nil {
+			return fmt.Errorf("insert span diagnostics %q: %w", sp.SpanID, err)
+		}
+		for linkIndex, link := range sp.Links {
+			if _, err = tx.ExecContext(ctx, insertSpanLinkSQL,
+				sp.SpanID, linkIndex, link.TraceID, link.SpanID, link.TraceState,
+				link.DroppedAttributesCount, link.Flags); err != nil {
+				return fmt.Errorf("insert span link %q/%d: %w", sp.SpanID, linkIndex, err)
+			}
+			for _, a := range link.Attributes {
+				if _, err = tx.ExecContext(ctx, insertSpanLinkAttrSQL,
+					sp.SpanID, linkIndex, a.Key, a.ValueType, a.Value); err != nil {
+					return fmt.Errorf("insert span link attr %q/%d/%q: %w", sp.SpanID, linkIndex, a.Key, err)
+				}
+			}
+		}
 	}
 
 	if err = tx.Commit(); err != nil {
@@ -134,7 +182,8 @@ func (s *Store) loadSpans(ctx context.Context, traceID string) ([]model.Span, er
 			status int32
 		)
 		if err := rows.Scan(&sp.SpanID, &parent, &sp.Name, &kind, &status,
-			&sp.StartedNs, &sp.EndedNs, &sp.DurationNs); err != nil {
+			&sp.StartedNs, &sp.EndedNs, &sp.DurationNs,
+			&sp.DroppedAttributesCount, &sp.DroppedLinksCount); err != nil {
 			return nil, fmt.Errorf("scan span: %w", err)
 		}
 		sp.TraceID = traceID
@@ -154,7 +203,74 @@ func (s *Store) loadSpans(ctx context.Context, traceID string) ([]model.Span, er
 	for i := range spans {
 		spans[i].Attributes = attrsBySpan[spans[i].SpanID]
 	}
+	linksBySpan, err := s.loadLinks(ctx, traceID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range spans {
+		spans[i].Links = linksBySpan[spans[i].SpanID]
+	}
 	return spans, nil
+}
+
+type linkKey struct {
+	spanID string
+	index  int
+}
+
+func (s *Store) loadLinks(ctx context.Context, traceID string) (map[string][]model.SpanLink, error) {
+	attrs, err := s.loadLinkAttrs(ctx, traceID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.db.QueryContext(ctx, selectLinksSQL, traceID)
+	if err != nil {
+		return nil, fmt.Errorf("query links for %q: %w", traceID, err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	bySpan := make(map[string][]model.SpanLink)
+	for rows.Next() {
+		var (
+			spanID string
+			index  int
+			link   model.SpanLink
+		)
+		if err := rows.Scan(&spanID, &index, &link.TraceID, &link.SpanID,
+			&link.TraceState, &link.DroppedAttributesCount, &link.Flags); err != nil {
+			return nil, fmt.Errorf("scan span link: %w", err)
+		}
+		link.Attributes = attrs[linkKey{spanID: spanID, index: index}]
+		bySpan[spanID] = append(bySpan[spanID], link)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate links for %q: %w", traceID, err)
+	}
+	return bySpan, nil
+}
+
+func (s *Store) loadLinkAttrs(ctx context.Context, traceID string) (map[linkKey][]model.Attribute, error) {
+	rows, err := s.db.QueryContext(ctx, selectLinkAttrsSQL, traceID)
+	if err != nil {
+		return nil, fmt.Errorf("query link attrs for %q: %w", traceID, err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := make(map[linkKey][]model.Attribute)
+	for rows.Next() {
+		var (
+			key linkKey
+			a   model.Attribute
+		)
+		if err := rows.Scan(&key.spanID, &key.index, &a.Key, &a.ValueType, &a.Value); err != nil {
+			return nil, fmt.Errorf("scan link attr: %w", err)
+		}
+		out[key] = append(out[key], a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate link attrs for %q: %w", traceID, err)
+	}
+	return out, nil
 }
 
 // loadAttrs reads every attribute for a trace in one query and groups them by

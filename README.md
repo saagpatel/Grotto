@@ -80,6 +80,44 @@ chmod +x grotto
 
 ## Usage
 
+### Inspect GenAI compaction and response chains
+
+`grotto compaction` renders a content-free Compaction X-Ray from genuine
+OpenTelemetry GenAI spans. It shows confirmed compaction boundaries,
+`previous_response` continuity, real OTel span links, boundary-local input/output
+token shifts, structural context resets, missing ancestry, and changes in
+caller-supplied synthetic labels, hashes, or fingerprints.
+
+```bash
+# Analyze an already-ingested local SQLite trace
+grotto compaction <trace-id>
+
+# Import one synthetic OTLP/JSON request in memory (no server or network)
+grotto compaction \
+  --otlp-json tests/fixtures/compaction/one_compaction.otlp.json
+
+# Emit the deterministic grotto.compaction_report.v1 contract
+grotto compaction \
+  --otlp-json tests/fixtures/compaction/one_compaction.otlp.json \
+  --json
+```
+
+The core follows the Development-status OpenTelemetry GenAI attributes
+`gen_ai.conversation.compacted`, `gen_ai.request.previous_response.id`,
+`gen_ai.response.id`, and `gen_ai.usage.*`. Missing or truncated evidence stays
+`UNKNOWN`. A token decrease is only a structural context-reset indicator; it is
+not evidence that meaning was lost or answer quality degraded. Answer drift is
+also `UNKNOWN` unless both sides supply the same kind of synthetic label, hash,
+or structural fingerprint. Grotto never calls a model or derives a fingerprint
+from message content.
+
+See [`P06-COMPACTION-XRAY-DESIGN.md`](P06-COMPACTION-XRAY-DESIGN.md) for the
+versioned contract, provenance rules, primary standards binding, experimental
+OpenAI adapter boundary, and privacy behavior. The reproducible five-minute demo
+is in [`docs/compaction-xray-demo.md`](docs/compaction-xray-demo.md), and the
+normative export schema is
+[`schemas/compaction-report-v1.schema.json`](schemas/compaction-report-v1.schema.json).
+
 ### Capture marks from a shell script
 
 Wrap any command with `grotto run`. Any `grotto mark` calls inside the command (or its subprocesses) are collected over the Unix domain socket and assembled into one trace.

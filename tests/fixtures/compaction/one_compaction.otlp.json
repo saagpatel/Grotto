@@ -1,0 +1,71 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {"key": "service.name", "value": {"stringValue": "synthetic-compaction-demo"}}
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {"name": "grotto.synthetic.compaction", "version": "1"},
+          "spans": [
+            {
+              "traceId": "EREREREREREREREREREREQ==",
+              "spanId": "AAAAAAAAAAE=",
+              "name": "synthetic conversation",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "100",
+              "endTimeUnixNano": "400"
+            },
+            {
+              "traceId": "EREREREREREREREREREREQ==",
+              "spanId": "AAAAAAAAAAM=",
+              "parentSpanId": "AAAAAAAAAAE=",
+              "name": "chat synthetic-model",
+              "kind": "SPAN_KIND_CLIENT",
+              "startTimeUnixNano": "300",
+              "endTimeUnixNano": "390",
+              "attributes": [
+                {"key": "gen_ai.operation.name", "value": {"stringValue": "chat"}},
+                {"key": "gen_ai.provider.name", "value": {"stringValue": "openai"}},
+                {"key": "gen_ai.response.id", "value": {"stringValue": "resp_after"}},
+                {"key": "gen_ai.request.previous_response.id", "value": {"stringValue": "resp_before"}},
+                {"key": "gen_ai.conversation.compacted", "value": {"boolValue": true}},
+                {"key": "gen_ai.usage.input_tokens", "value": {"intValue": "3500"}},
+                {"key": "gen_ai.usage.output_tokens", "value": {"intValue": "550"}},
+                {"key": "grotto.compaction.answer.hash", "value": {"stringValue": "synthetic-hash-b"}}
+              ],
+              "links": [
+                {
+                  "traceId": "EREREREREREREREREREREQ==",
+                  "spanId": "AAAAAAAAAAI=",
+                  "attributes": [
+                    {"key": "gen_ai.response.id", "value": {"stringValue": "resp_before"}}
+                  ]
+                }
+              ]
+            },
+            {
+              "traceId": "EREREREREREREREREREREQ==",
+              "spanId": "AAAAAAAAAAI=",
+              "parentSpanId": "AAAAAAAAAAE=",
+              "name": "chat synthetic-model",
+              "kind": "SPAN_KIND_CLIENT",
+              "startTimeUnixNano": "200",
+              "endTimeUnixNano": "290",
+              "attributes": [
+                {"key": "gen_ai.operation.name", "value": {"stringValue": "chat"}},
+                {"key": "gen_ai.provider.name", "value": {"stringValue": "openai"}},
+                {"key": "gen_ai.response.id", "value": {"stringValue": "resp_before"}},
+                {"key": "gen_ai.usage.input_tokens", "value": {"intValue": "10000"}},
+                {"key": "gen_ai.usage.output_tokens", "value": {"intValue": "500"}},
+                {"key": "grotto.compaction.answer.hash", "value": {"stringValue": "synthetic-hash-a"}}
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

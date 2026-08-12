@@ -68,12 +68,14 @@ func mapSpan(sp *tracepb.Span) model.Span {
 		TraceID: hex.EncodeToString(sp.GetTraceId()),
 		// GetParentSpanId returns nil (not zero bytes) when absent, and
 		// hex.EncodeToString(nil) == "", which is the root sentinel.
-		ParentSpanID: hex.EncodeToString(sp.GetParentSpanId()),
-		Name:         sp.GetName(),
-		Kind:         model.SpanKind(sp.GetKind()),
-		Status:       status,
-		StartedNs:    int64(sp.GetStartTimeUnixNano()),
-		EndedNs:      int64(sp.GetEndTimeUnixNano()),
+		ParentSpanID:           hex.EncodeToString(sp.GetParentSpanId()),
+		Name:                   sp.GetName(),
+		Kind:                   model.SpanKind(sp.GetKind()),
+		Status:                 status,
+		StartedNs:              int64(sp.GetStartTimeUnixNano()),
+		EndedNs:                int64(sp.GetEndTimeUnixNano()),
+		DroppedAttributesCount: sp.GetDroppedAttributesCount(),
+		DroppedLinksCount:      sp.GetDroppedLinksCount(),
 	}
 	ms.DurationNs = ms.EndedNs - ms.StartedNs
 
@@ -81,6 +83,25 @@ func mapSpan(sp *tracepb.Span) model.Span {
 		ms.Attributes = make([]model.Attribute, 0, len(attrs))
 		for _, kv := range attrs {
 			ms.Attributes = append(ms.Attributes, mapAttribute(kv))
+		}
+	}
+	if links := sp.GetLinks(); len(links) > 0 {
+		ms.Links = make([]model.SpanLink, 0, len(links))
+		for _, link := range links {
+			ml := model.SpanLink{
+				TraceID:                hex.EncodeToString(link.GetTraceId()),
+				SpanID:                 hex.EncodeToString(link.GetSpanId()),
+				TraceState:             link.GetTraceState(),
+				DroppedAttributesCount: link.GetDroppedAttributesCount(),
+				Flags:                  link.GetFlags(),
+			}
+			if attrs := link.GetAttributes(); len(attrs) > 0 {
+				ml.Attributes = make([]model.Attribute, 0, len(attrs))
+				for _, kv := range attrs {
+					ml.Attributes = append(ml.Attributes, mapAttribute(kv))
+				}
+			}
+			ms.Links = append(ms.Links, ml)
 		}
 	}
 	return ms
