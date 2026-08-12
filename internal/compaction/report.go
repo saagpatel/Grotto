@@ -144,6 +144,7 @@ func Analyze(trace model.Trace) Report {
 		Schema:          SchemaVersion,
 		TraceID:         trace.TraceID,
 		SourceSpanCount: len(trace.Spans),
+		Observations:    make([]Observation, 0),
 		SemanticConventions: Standards{
 			Family: "OpenTelemetry GenAI", Status: "development",
 			AsOf: "2026-08-11", Commit: "8d3e4a0f3c34a46f6edb9c71e8666e02e6bf3958",
@@ -164,17 +165,20 @@ func Analyze(trace model.Trace) Report {
 		return report
 	}
 
+	for i := range work {
+		resolveLinkAncestry(trace.TraceID, &work[i], work, &report.Warnings)
+	}
 	work, orderingWarnings := orderObservations(work)
 	report.Warnings = append(report.Warnings, orderingWarnings...)
-	indexByResponse := make(map[string]int)
+	indexByResponse, duplicateResponseIDs := uniqueResponseIndex(work)
+	seenResponseIDs := make(map[string]struct{})
 	children := make(map[string]int)
 	for i := range work {
 		if id := work[i].Chain.ResponseID; id != "" {
-			if _, exists := indexByResponse[id]; exists {
+			if _, exists := seenResponseIDs[id]; exists {
 				report.Warnings = append(report.Warnings, Warning{Code: "duplicate_response_id", SpanID: work[i].SpanID, Message: "response id is not unique; ancestry is ambiguous"})
-			} else {
-				indexByResponse[id] = i
 			}
+			seenResponseIDs[id] = struct{}{}
 		}
 		if prev := work[i].Chain.PreviousResponseID; prev != "" {
 			children[prev]++
@@ -182,7 +186,7 @@ func Analyze(trace model.Trace) Report {
 	}
 
 	for i := range work {
-		resolveContinuity(trace.TraceID, &work[i], work, indexByResponse, children, &report.Warnings)
+		resolveContinuity(trace.TraceID, &work[i], work, indexByResponse, duplicateResponseIDs, children, &report.Warnings)
 		var previous *workingObservation
 		if prevIndex, ok := indexByResponse[work[i].Chain.PreviousResponseID]; ok && prevIndex != i {
 			previous = &work[prevIndex]
@@ -340,14 +344,7 @@ func parseToken(attrs map[string]string, key, spanID string, warnings []Warning)
 }
 
 func orderObservations(in []workingObservation) ([]workingObservation, []Warning) {
-	byResponse := make(map[string]int)
-	for i := range in {
-		if in[i].Chain.ResponseID != "" {
-			if _, exists := byResponse[in[i].Chain.ResponseID]; !exists {
-				byResponse[in[i].Chain.ResponseID] = i
-			}
-		}
-	}
+	byResponse, _ := uniqueResponseIndex(in)
 	indegree := make([]int, len(in))
 	children := make(map[int][]int)
 	for i := range in {
@@ -401,7 +398,64 @@ func orderObservations(in []workingObservation) ([]workingObservation, []Warning
 	return out, warnings
 }
 
-func resolveContinuity(traceID string, item *workingObservation, all []workingObservation, byResponse map[string]int, children map[string]int, warnings *[]Warning) {
+func uniqueResponseIndex(in []workingObservation) (map[string]int, map[string]struct{}) {
+	byResponse := make(map[string]int)
+	duplicates := make(map[string]struct{})
+	for i := range in {
+		responseID := in[i].Chain.ResponseID
+		if responseID == "" {
+			continue
+		}
+		if _, duplicate := duplicates[responseID]; duplicate {
+			continue
+		}
+		if _, exists := byResponse[responseID]; exists {
+			delete(byResponse, responseID)
+			duplicates[responseID] = struct{}{}
+			continue
+		}
+		byResponse[responseID] = i
+	}
+	return byResponse, duplicates
+}
+
+func resolveLinkAncestry(traceID string, item *workingObservation, all []workingObservation, warnings *[]Warning) {
+	linkedTargets, externalLinks := linkTargets(traceID, item, all)
+
+	if len(linkedTargets) == 1 {
+		item.Chain.LinkedSpanID = linkedTargets[0].SpanID
+		item.Provenance = append(item.Provenance, Provenance{Signal: "response_link", Source: "otel_span_link", Field: linkedTargets[0].SpanID})
+		if item.Chain.PreviousResponseID == "" && linkedTargets[0].Chain.ResponseID != "" {
+			item.Chain.PreviousResponseID = linkedTargets[0].Chain.ResponseID
+		}
+		return
+	}
+	if len(linkedTargets) > 1 {
+		item.Chain.Status = "ambiguous"
+		*warnings = append(*warnings, Warning{Code: "ambiguous_span_links", SpanID: item.SpanID, Message: "multiple same-trace response links could supply ancestry"})
+		return
+	}
+	if len(externalLinks) == 1 {
+		link := externalLinks[0]
+		item.Chain.LinkedSpanID = link.SpanID
+		item.Provenance = append(item.Provenance, Provenance{Signal: "response_link", Source: "otel_span_link", Field: link.TraceID + "/" + link.SpanID})
+		if item.Chain.PreviousResponseID == "" {
+			for _, attr := range link.Attributes {
+				if attr.Key == attrResponseID && attr.Value != "" {
+					item.Chain.PreviousResponseID = attr.Value
+					break
+				}
+			}
+		}
+		return
+	}
+	if len(externalLinks) > 1 {
+		item.Chain.Status = "ambiguous"
+		*warnings = append(*warnings, Warning{Code: "ambiguous_span_links", SpanID: item.SpanID, Message: "multiple cross-trace links could supply response ancestry"})
+	}
+}
+
+func linkTargets(traceID string, item *workingObservation, all []workingObservation) ([]workingObservation, []model.SpanLink) {
 	var linkedTargets []workingObservation
 	var externalLinks []model.SpanLink
 	for _, link := range item.span.Links {
@@ -416,31 +470,12 @@ func resolveContinuity(traceID string, item *workingObservation, all []workingOb
 			}
 		}
 	}
-	if len(linkedTargets) == 1 {
-		item.Chain.LinkedSpanID = linkedTargets[0].SpanID
-		item.Provenance = append(item.Provenance, Provenance{Signal: "response_link", Source: "otel_span_link", Field: linkedTargets[0].SpanID})
-		if item.Chain.PreviousResponseID == "" && linkedTargets[0].Chain.ResponseID != "" {
-			item.Chain.PreviousResponseID = linkedTargets[0].Chain.ResponseID
-		}
-	} else if len(linkedTargets) > 1 {
-		item.Chain.Status = "ambiguous"
-		*warnings = append(*warnings, Warning{Code: "ambiguous_span_links", SpanID: item.SpanID, Message: "multiple same-trace response links could supply ancestry"})
-		return
-	} else if len(externalLinks) == 1 {
-		link := externalLinks[0]
-		item.Chain.LinkedSpanID = link.SpanID
-		item.Provenance = append(item.Provenance, Provenance{Signal: "response_link", Source: "otel_span_link", Field: link.TraceID + "/" + link.SpanID})
-		if item.Chain.PreviousResponseID == "" {
-			for _, attr := range link.Attributes {
-				if attr.Key == attrResponseID && attr.Value != "" {
-					item.Chain.PreviousResponseID = attr.Value
-					break
-				}
-			}
-		}
-	} else if len(externalLinks) > 1 {
-		item.Chain.Status = "ambiguous"
-		*warnings = append(*warnings, Warning{Code: "ambiguous_span_links", SpanID: item.SpanID, Message: "multiple cross-trace links could supply response ancestry"})
+	return linkedTargets, externalLinks
+}
+
+func resolveContinuity(traceID string, item *workingObservation, all []workingObservation, byResponse map[string]int, duplicateResponseIDs map[string]struct{}, children map[string]int, warnings *[]Warning) {
+	linkedTargets, externalLinks := linkTargets(traceID, item, all)
+	if item.Chain.Status == "ambiguous" {
 		return
 	}
 
@@ -450,13 +485,16 @@ func resolveContinuity(traceID string, item *workingObservation, all []workingOb
 		item.Chain.Status = "unknown"
 	case prev == "":
 		item.Chain.Status = "root"
-	case len(externalLinks) == 1:
+	case len(linkedTargets) == 0 && len(externalLinks) == 1:
 		item.Chain.Status = "linked_external"
-	case children[prev] > 1:
-		item.Chain.Status = "branched"
+	case isDuplicateResponse(duplicateResponseIDs, prev):
+		item.Chain.Status = "ambiguous"
+		*warnings = append(*warnings, Warning{Code: "ambiguous_previous_response", SpanID: item.SpanID, Message: "previous response id is duplicated; ancestry-dependent signals remain UNKNOWN"})
 	case !hasResponse(byResponse, prev):
 		item.Chain.Status = "missing_ancestry"
 		*warnings = append(*warnings, Warning{Code: "missing_previous_response", SpanID: item.SpanID, Message: "previous response id has no matching span in this trace"})
+	case children[prev] > 1:
+		item.Chain.Status = "branched"
 	default:
 		item.Chain.Status = "linked"
 	}
@@ -468,6 +506,11 @@ func resolveContinuity(traceID string, item *workingObservation, all []workingOb
 			}
 		}
 	}
+}
+
+func isDuplicateResponse(duplicates map[string]struct{}, responseID string) bool {
+	_, ok := duplicates[responseID]
+	return ok
 }
 
 func hasResponse(index map[string]int, responseID string) bool {
