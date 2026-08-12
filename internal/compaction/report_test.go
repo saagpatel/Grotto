@@ -159,6 +159,58 @@ func TestAnalyze_SpanLinksSupplyAndValidateAncestry(t *testing.T) {
 	assert.Equal(t, "prior-span", externalReport.Observations[0].Chain.LinkedSpanID)
 }
 
+func TestAnalyze_NonGenAITraceEmitsEmptyObservationsArray(t *testing.T) {
+	report := Analyze(trace())
+	require.NotNil(t, report.Observations)
+	assert.Empty(t, report.Observations)
+
+	var encoded bytes.Buffer
+	require.NoError(t, WriteJSON(&encoded, report))
+	assert.Contains(t, encoded.String(), `"observations": []`)
+}
+
+func TestAnalyze_LinkDerivedAncestryOrdersParentBeforeClockSkewedChild(t *testing.T) {
+	parent := responseSpan("z-parent", 20, "resp_parent", "", nil, nil, nil)
+	child := responseSpan("a-child", 10, "resp_child", "", nil, nil, nil)
+	child.Links = []model.SpanLink{{TraceID: fixtureTraceID, SpanID: parent.SpanID}}
+
+	report := Analyze(trace(child, parent))
+	require.Len(t, report.Observations, 2)
+	assert.Equal(t, "z-parent", report.Observations[0].SpanID)
+	assert.Equal(t, "a-child", report.Observations[1].SpanID)
+	assert.Equal(t, "resp_parent", report.Observations[1].Chain.PreviousResponseID)
+	assert.Equal(t, "linked", report.Observations[1].Chain.Status)
+}
+
+func TestAnalyze_DuplicateResponseIDKeepsDependentAncestryUnknown(t *testing.T) {
+	beforeA, beforeB, after := int64(100), int64(200), int64(50)
+	yes := true
+	first := responseSpan("first", 1, "resp_duplicate", "", &beforeA, nil, nil)
+	second := responseSpan("second", 2, "resp_duplicate", "", &beforeB, nil, nil)
+	child := responseSpan("child", 3, "resp_child", "resp_duplicate", &after, nil, &yes)
+
+	report := Analyze(trace(first, second, child))
+	require.Len(t, report.Observations, 3)
+	dependent := report.Observations[2]
+	assert.Equal(t, "ambiguous", dependent.Chain.Status)
+	assert.Equal(t, "unknown", dependent.Tokens.InputShift.Before.State)
+	assert.Equal(t, "unknown", dependent.Tokens.InputShift.Delta.State)
+	assert.Equal(t, "unknown", dependent.ContextReset.State)
+	assertWarning(t, report, "duplicate_response_id")
+	assertWarning(t, report, "ambiguous_previous_response")
+}
+
+func TestAnalyze_MissingSharedPreviousIDIsNotAFalseBranch(t *testing.T) {
+	first := responseSpan("first", 1, "resp_first", "resp_missing", nil, nil, nil)
+	second := responseSpan("second", 2, "resp_second", "resp_missing", nil, nil, nil)
+
+	report := Analyze(trace(first, second))
+	require.Len(t, report.Observations, 2)
+	assert.Equal(t, "missing_ancestry", report.Observations[0].Chain.Status)
+	assert.Equal(t, "missing_ancestry", report.Observations[1].Chain.Status)
+	assertWarning(t, report, "missing_previous_response")
+}
+
 func TestAnalyze_MalformedDataIsDeterministicAndNonSemantic(t *testing.T) {
 	no := false
 	span := responseSpan("bad", 1, "resp_bad", "", nil, nil, &no)
