@@ -6,7 +6,7 @@ Grotto is local-first, but local telemetry can still contain credentials, sessio
 
 - Both marks and OTLP ingest pass through one versioned evaluator before SQLite.
 - `grotto redact-preview` evaluates an imported or stored trace without mutating it.
-- Preview never prints retained raw values. It reports path, category, matched rule, action, original type/byte length, and a masked preview or versioned digest.
+- Preview never prints retained raw values or instrumentation-supplied keys. It reports structural paths with stable opaque key references, category, matched rule, action, original type/byte length, and a masked preview or versioned digest.
 - There is no reveal mode. Raw values are never copied into logs, reports, reversible maps, encryption envelopes, or secret escrow.
 - Authorization headers, token/cookie attributes, credential-shaped strings, emails, home-user paths, and URL query strings are masked by default.
 - GenAI messages, prompts, completions, system instructions, tool arguments, and tool results are dropped by default.

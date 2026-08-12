@@ -11,7 +11,7 @@ arm64 and Linux amd64 binaries plus checksums. The downloaded release binary rep
 Branch `codex/p08-trace-redaction-preview` adds a local dry-run disclosure plan
 for imported and stored traces. `grotto redact-preview` and `InsertTrace` share
 the embedded Policy V1 evaluator; preview uses raw-content-off reports and a
-read-only immutable SQLite path. Policy/report schemas, synthetic fixtures,
+locking read-only SQLite path with normal change detection. Policy/report schemas, synthetic fixtures,
 privacy guidance, and the five-minute demo are linked from the README. P06
 compaction visualization and P09 token/cache ledgers remain sibling-owned.
 

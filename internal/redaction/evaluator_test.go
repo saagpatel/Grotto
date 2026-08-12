@@ -79,9 +79,9 @@ func TestRulePrecedence_AllowlistAndLexicalTieBreakAreDeterministic(t *testing.T
 	result, err := evaluator.Evaluate(trace, Options{SourceKind: "test", SourceRef: "precedence"})
 	require.NoError(t, err)
 	decisions := decisionsByPath(result.Report.Decisions)
-	assert.Equal(t, "allow.support", decisions[`spans[0].attributes["contact"]`].MatchedRule)
-	assert.Equal(t, ActionRetain, decisions[`spans[0].attributes["contact"]`].Action)
-	assert.Equal(t, "a.tie", decisions[`spans[0].attributes["tie"]`].MatchedRule)
+	assert.Equal(t, "allow.support", decisions[safeDecisionPath(`spans[0].attributes["contact"]`)].MatchedRule)
+	assert.Equal(t, ActionRetain, decisions[safeDecisionPath(`spans[0].attributes["contact"]`)].Action)
+	assert.Equal(t, "a.tie", decisions[safeDecisionPath(`spans[0].attributes["tie"]`)].MatchedRule)
 }
 
 func TestEvaluator_IdempotentWithStableBinaryDigest(t *testing.T) {
@@ -160,7 +160,7 @@ func TestEvaluator_UnicodeTruncationIsValidAndBounded(t *testing.T) {
 	value := result.Trace.Spans[0].Attributes[0].Value
 	assert.True(t, utf8.ValidString(value))
 	assert.LessOrEqual(t, len(value), 32)
-	assert.Equal(t, ActionTruncate, decisionsByPath(result.Report.Decisions)[`spans[0].attributes["unicode"]`].Action)
+	assert.Equal(t, ActionTruncate, decisionsByPath(result.Report.Decisions)[safeDecisionPath(`spans[0].attributes["unicode"]`)].Action)
 }
 
 func TestEvaluator_MalformedJSONAndDepthLimitAreUnknownFailClosed(t *testing.T) {
@@ -258,6 +258,31 @@ func TestWritersNeverRenderRawTruncatedContent(t *testing.T) {
 	require.NoError(t, WriteJSON(&out, result.Report))
 	assert.NotContains(t, out.String(), "candidate exception body")
 	assert.Contains(t, out.String(), "<truncated:")
+}
+
+func TestEvaluator_NeverReportsInstrumentationSuppliedAttributeKeys(t *testing.T) {
+	evaluator, err := DefaultEvaluator()
+	require.NoError(t, err)
+	privateKey := "patient Alice Example"
+	result, err := evaluator.Evaluate(
+		traceWithAttrs(model.Attribute{Key: privateKey, ValueType: "str", Value: "ordinary metadata"}),
+		Options{SourceKind: "test", SourceRef: "untrusted-key"},
+	)
+	require.NoError(t, err)
+	require.Len(t, result.Trace.Spans[0].Attributes, 1)
+	assert.Equal(t, privateKey, result.Trace.Spans[0].Attributes[0].Key, "the applied trace keeps a non-sensitive key")
+
+	var textOut, jsonOut bytes.Buffer
+	require.NoError(t, WriteText(&textOut, result.Report))
+	require.NoError(t, WriteJSON(&jsonOut, result.Report))
+	assert.NotContains(t, textOut.String(), privateKey)
+	assert.NotContains(t, jsonOut.String(), privateKey)
+	require.Len(t, result.Report.Decisions, 4)
+	var paths strings.Builder
+	for _, decision := range result.Report.Decisions {
+		paths.WriteString(decision.Path)
+	}
+	assert.Contains(t, paths.String(), "<field:")
 }
 
 func testPolicy(rules []Rule) Policy {

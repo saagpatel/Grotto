@@ -397,7 +397,7 @@ Grotto is local-only by design. The OTLP receiver binds `127.0.0.1` and is unaut
 
 Before any trace is written to disk, `internal/store/redact.go` applies a redaction pass against four credential patterns: AWS access key IDs (`AKIA…`), GitHub personal access tokens (`ghp_…`), OpenAI-style secret keys (`sk-…`), and Slack tokens (`xox[baprs]-…`). Matches in span names, run labels, and attribute values are replaced with `‹redacted›`. The redaction runs at the single `InsertTrace` chokepoint so both capture paths are covered without duplicating the logic.
 
-The P08 policy evaluator extends that chokepoint with a versioned, field-by-field policy for authorization headers, tokens, cookies, email/home-path/URL data, GenAI content, nested JSON, binary values, and size/depth bounds. `grotto redact-preview` uses the same evaluator against imported JSON or an immutable read-only SQLite connection. Its output is raw-content-off and there is no reveal mode. See [privacy](docs/privacy.md), [policy](docs/redaction-policy.md), and the [five-minute demo](docs/demo-redaction-preview.md).
+The P08 policy evaluator extends that chokepoint with a versioned, field-by-field policy for authorization headers, tokens, cookies, email/home-path/URL data, GenAI content, nested JSON, binary values, and size/depth bounds. `grotto redact-preview` uses the same evaluator against imported JSON or a locking read-only SQLite connection with normal change detection. Report paths pseudonymize instrumentation-supplied attribute and JSON keys, its output is raw-content-off, and there is no reveal mode. See [privacy](docs/privacy.md), [policy](docs/redaction-policy.md), and the [five-minute demo](docs/demo-redaction-preview.md).
 
 ---
 
