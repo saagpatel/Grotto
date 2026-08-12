@@ -22,16 +22,15 @@ This project inherits the global CC setup: 34+ skills, agents, hooks, and MCP pl
 Project-specific overrides only — see IMPLEMENTATION-ROADMAP.md for architecture.
 
 ## Current Phase
-**v1 complete; public release current through v1.8.3; additive P06 is active in source.**
-The seven released subcommands remain run/mark/serve/show/list/diff/tui. P06 adds
-an eighth, `compaction`, for deterministic local GenAI compaction and response-chain
-reports. The OTLP receiver, interactive TUI, ingest redaction, static binaries, and
-three adapters (`cargo`, `go-test`, `junit`) remain intact. See
-IMPLEMENTATION-ROADMAP.md, P06-COMPACTION-XRAY-DESIGN.md, and HANDOFF.md.
-
-**Active additive increment:** P08 adds an eighth source-level command,
-`redact-preview`, plus a versioned canonical ingest/preview evaluator. This is
-branch state until merged and is not part of the v1.8.3 public binary.
+**v1 complete; public release current through v1.8.3; P06, P08, and P09 are
+integrated in source on the canonical trace-labs branch.** The seven released
+subcommands remain run/mark/serve/show/list/diff/tui. Source adds `compaction`
+and `redact-preview`, while P09 extends `show` with ledger flags. The shared
+contract preserves genuine OTel span links, applies one canonical redaction
+evaluator before persistence and fixture analysis, and retains safe numeric
+usage measurements for compaction and ledger reports. This branch state is not
+a claim about the v1.8.3 public binary. See IMPLEMENTATION-ROADMAP.md,
+P06-COMPACTION-XRAY-DESIGN.md, P09-CACHE-CONTEXT-LEDGER-DESIGN.md, and HANDOFF.md.
 
 ## Key Decisions
 | Decision | Choice | Why |
@@ -60,15 +59,12 @@ Local-first Go CLI + TUI that renders OpenTelemetry trace waterfalls for shell c
 
 ## Current State
 
-**v1 complete; public release current through v1.8.3; additive P06 is active in source.**
-The seven released subcommands remain run/mark/serve/show/list/diff/tui. P06 adds
-`compaction` for deterministic local GenAI compaction and response-chain reports.
-The OTLP receiver, interactive TUI, ingest redaction, static binaries, and three
-adapters (`cargo`, `go-test`, `junit`) remain intact. See IMPLEMENTATION-ROADMAP.md,
-P06-COMPACTION-XRAY-DESIGN.md, and HANDOFF.md.
-
-P08 Trace Redaction Preview is the only reactivated post-v1 increment in this
-worktree. Its source-level command is not a claim about the v1.8.3 release.
+**v1 complete; public release current through v1.8.3; P06, P08, and P09 are
+integrated in source on the canonical trace-labs branch.** Source adds the
+`compaction` and `redact-preview` commands plus `show` ledger flags without
+changing the seven-command v1.8.3 release. Their common OTel model, store,
+redaction, CLI, schema, and documentation contracts are reconciled here; this
+source-level state is not a claim about runtime or release uptake.
 
 ## Stack
 

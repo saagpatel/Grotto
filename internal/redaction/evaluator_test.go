@@ -264,20 +264,27 @@ func TestEvaluator_NeverReportsInstrumentationSuppliedAttributeKeys(t *testing.T
 	evaluator, err := DefaultEvaluator()
 	require.NoError(t, err)
 	privateKey := "patient Alice Example"
-	result, err := evaluator.Evaluate(
-		traceWithAttrs(model.Attribute{Key: privateKey, ValueType: "str", Value: "ordinary metadata"}),
-		Options{SourceKind: "test", SourceRef: "untrusted-key"},
-	)
+	privateLinkKey := "account Bob Example"
+	trace := traceWithAttrs(model.Attribute{Key: privateKey, ValueType: "str", Value: "ordinary metadata"})
+	trace.Spans[0].Links = []model.SpanLink{{
+		TraceID: "linked-trace", SpanID: "linked-span",
+		Attributes: []model.Attribute{{Key: privateLinkKey, ValueType: "str", Value: "ordinary link metadata"}},
+	}}
+	result, err := evaluator.Evaluate(trace, Options{SourceKind: "test", SourceRef: "untrusted-key"})
 	require.NoError(t, err)
 	require.Len(t, result.Trace.Spans[0].Attributes, 1)
 	assert.Equal(t, privateKey, result.Trace.Spans[0].Attributes[0].Key, "the applied trace keeps a non-sensitive key")
+	require.Len(t, result.Trace.Spans[0].Links[0].Attributes, 1)
+	assert.Equal(t, privateLinkKey, result.Trace.Spans[0].Links[0].Attributes[0].Key, "the applied link keeps a non-sensitive key")
 
 	var textOut, jsonOut bytes.Buffer
 	require.NoError(t, WriteText(&textOut, result.Report))
 	require.NoError(t, WriteJSON(&jsonOut, result.Report))
-	assert.NotContains(t, textOut.String(), privateKey)
-	assert.NotContains(t, jsonOut.String(), privateKey)
-	require.Len(t, result.Report.Decisions, 4)
+	for _, key := range []string{privateKey, privateLinkKey} {
+		assert.NotContains(t, textOut.String(), key)
+		assert.NotContains(t, jsonOut.String(), key)
+	}
+	require.Len(t, result.Report.Decisions, 5)
 	var paths strings.Builder
 	for _, decision := range result.Report.Decisions {
 		paths.WriteString(decision.Path)

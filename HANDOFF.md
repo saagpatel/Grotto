@@ -6,18 +6,21 @@ GitHub releases are tagged, and `v1.8.3` is the latest public release with macOS
 arm64 and Linux amd64 binaries plus checksums. The downloaded release binary reports
 `grotto v1.8.3`.
 
-## Active Increment — P08 Trace Redaction Preview
+## Active Source Integration — P06, P08, and P09 Trace Labs
 
-Branch `codex/p08-trace-redaction-preview` adds a local dry-run disclosure plan
-for imported and stored traces. `grotto redact-preview` and `InsertTrace` share
-the embedded Policy V1 evaluator; preview uses raw-content-off reports and a
-locking read-only SQLite path with normal change detection. Policy/report schemas, synthetic fixtures,
-privacy guidance, and the five-minute demo are linked from the README. P06
-compaction visualization and P09 token/cache ledgers remain sibling-owned.
+Branch `codex/r02-grotto-trace-labs-integration` is the canonical review path for
+three additive increments: P06 Compaction X-Ray, P08 Trace Redaction Preview,
+and P09 Cache and Context Ledger. The integration preserves real OTel span links
+through the model and SQLite store, routes both persistence and in-memory fixture
+analysis through the embedded Policy V1 evaluator, retains safe numeric usage
+measurements, and exposes `compaction`, `redact-preview`, and `show --ledger` from
+one coherent CLI. Read-only preview uses a locking SQLite connection with normal
+change detection; reports remain raw-content-off and uncertainty remains
+`UNKNOWN` when evidence is missing, malformed, conflicting, or ambiguous.
 
-This section describes branch state, not public v1.8.3 runtime uptake or a new
-release. See `docs/design/phase-p08-trace-redaction-preview.md` for the exact
-contract and current official-source evidence boundary.
+This section describes source and local verification, not public v1.8.3 runtime
+uptake or a new release. The P06, P08, and P09 design documents retain ownership
+and evidence boundaries for their individual capabilities.
 
 ## Shipped This Session (2026-06-06) — v1.3 -> v1.8
 - **v1.4.0** — the cargo build adapter (`grotto run --adapter=cargo` -> per-crate
