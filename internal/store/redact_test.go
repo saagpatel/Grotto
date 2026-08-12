@@ -2,6 +2,7 @@ package store
 
 import (
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"os"
 	"path/filepath"
@@ -124,6 +125,38 @@ func TestOpenReadOnly_ObservesLaterCommittedTrace(t *testing.T) {
 	assert.Equal(t, "after", got.TraceID)
 }
 
+func TestOpenReadOnly_LoadsPreSpanLinkSchemaWithoutMigrating(t *testing.T) {
+	ctx := t.Context()
+	path := filepath.Join(t.TempDir(), "pre-span-links.db")
+	schema, err := os.ReadFile(filepath.Join("..", "..", "migrations", "001_init.sql"))
+	require.NoError(t, err)
+	db, err := sql.Open("sqlite", "file:"+path)
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, string(schema))
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, `
+		INSERT INTO traces (trace_id, run_label, source, root_name, started_ns, ended_ns, duration_ns, span_count, created_at)
+		VALUES ('legacy', 'fixture', 'mark', 'root', 0, 100, 100, 1, 0);
+		INSERT INTO spans (span_id, trace_id, parent_span_id, name, kind, status_code, started_ns, ended_ns, duration_ns)
+		VALUES ('legacy-root', 'legacy', NULL, 'root', 1, 1, 0, 100, 100);
+	`)
+	require.NoError(t, err)
+	require.NoError(t, db.Close())
+
+	before := fileDigest(t, path)
+	ro, err := OpenReadOnly(ctx, path)
+	require.NoError(t, err)
+	got, err := ro.GetTrace(ctx, "legacy")
+	require.NoError(t, err)
+	require.NoError(t, ro.Close())
+	require.Len(t, got.Spans, 1)
+	assert.Equal(t, "legacy-root", got.Spans[0].SpanID)
+	assert.Zero(t, got.Spans[0].DroppedAttributesCount)
+	assert.Zero(t, got.Spans[0].DroppedLinksCount)
+	assert.Empty(t, got.Spans[0].Links)
+	assert.Equal(t, before, fileDigest(t, path), "read-only compatibility must not apply migration 002")
+}
+
 func fileDigest(t *testing.T, path string) string {
 	t.Helper()
 	b, err := os.ReadFile(path)
@@ -142,4 +175,21 @@ func TestRedact_MasksLinkAttributeValuesWithoutMutatingInput(t *testing.T) {
 
 	assert.Equal(t, "‹redacted›", got.Spans[0].Links[0].Attributes[0].Value)
 	assert.Equal(t, githubPAT, orig.Spans[0].Links[0].Attributes[0].Value)
+}
+
+func TestInsertTrace_RedactsLinkTraceStateBeforePersistence(t *testing.T) {
+	st, ctx := newTestStore(t)
+	secret := "sk-" + strings.Repeat("T", 24)
+	original := minimalTrace("trace-state", "fixture", 1)
+	original.Spans[0].Links = []model.SpanLink{{
+		TraceID: "linked-trace", SpanID: "linked-span", TraceState: "vendor=" + secret,
+	}}
+
+	require.NoError(t, st.InsertTrace(ctx, original))
+	got, err := st.GetTrace(ctx, original.TraceID)
+	require.NoError(t, err)
+	require.Len(t, got.Spans[0].Links, 1)
+	assert.NotContains(t, got.Spans[0].Links[0].TraceState, secret)
+	assert.Contains(t, got.Spans[0].Links[0].TraceState, "‹redacted›")
+	assert.Contains(t, original.Spans[0].Links[0].TraceState, secret, "input must not be mutated")
 }

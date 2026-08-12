@@ -10,8 +10,10 @@ Grotto is local-first, but local telemetry can still contain credentials, sessio
 - There is no reveal mode. Raw values are never copied into logs, reports, reversible maps, encryption envelopes, or secret escrow.
 - Authorization headers, token/cookie attributes, credential-shaped strings, emails, home-user paths, and URL query strings are masked by default.
 - GenAI messages, prompts, completions, system instructions, tool arguments, and tool results are dropped by default.
+- Span-link trace-state and link attributes use the same evaluator as span fields, and whole-field drops take precedence over nested credential masks.
 - Binary values are represented by a stable domain-separated SHA-256 digest. Hashing is not anonymization for small or predictable input spaces.
 - Declared JSON that is malformed or exceeds the nesting bound is `UNKNOWN` and fails closed.
+- Stored-trace preview uses a locking read-only connection and can read the pre-span-link schema without applying migrations; unavailable diagnostics and links are returned as empty legacy data.
 
 ## Boundaries
 

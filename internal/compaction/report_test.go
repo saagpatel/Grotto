@@ -159,6 +159,20 @@ func TestAnalyze_SpanLinksSupplyAndValidateAncestry(t *testing.T) {
 	assert.Equal(t, "prior-span", externalReport.Observations[0].Chain.LinkedSpanID)
 }
 
+func TestAnalyze_OrdinaryCrossTraceLinkDoesNotSupplyResponseAncestry(t *testing.T) {
+	span := responseSpan("external", 1, "resp_current", "resp_missing", nil, nil, nil)
+	span.Links = []model.SpanLink{{
+		TraceID: "22222222222222222222222222222222", SpanID: "ordinary-linked-span",
+		Attributes: []model.Attribute{strAttr("messaging.message.id", "message-1")},
+	}}
+
+	report := Analyze(trace(span))
+	require.Len(t, report.Observations, 1)
+	assert.Equal(t, "missing_ancestry", report.Observations[0].Chain.Status)
+	assert.Empty(t, report.Observations[0].Chain.LinkedSpanID)
+	assertWarning(t, report, "missing_previous_response")
+}
+
 func TestAnalyze_NonGenAITraceEmitsEmptyObservationsArray(t *testing.T) {
 	report := Analyze(trace())
 	require.NotNil(t, report.Observations)

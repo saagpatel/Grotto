@@ -58,9 +58,13 @@ func (e *Evaluator) Evaluate(t model.Trace, opts Options) (Result, error) {
 		sp.Links = make([]model.SpanLink, len(originalSpan.Links))
 		for linkIndex, originalLink := range originalSpan.Links {
 			link := originalLink
+			linkPath := fmt.Sprintf("%s.links[%d]", spanPath, linkIndex)
+			if originalLink.TraceState != "" {
+				link.TraceState, decisions = e.evaluateStructural(linkPath+".trace_state", "str", originalLink.TraceState, decisions)
+			}
 			link.Attributes = make([]model.Attribute, 0, len(originalLink.Attributes))
 			for _, originalAttr := range originalLink.Attributes {
-				rawPath := fmt.Sprintf("%s.links[%d].attributes[%s]", spanPath, linkIndex, strconv.Quote(originalAttr.Key))
+				rawPath := linkPath + ".attributes[" + strconv.Quote(originalAttr.Key) + "]"
 				keyRule := e.winner("metadata.attribute_key", originalAttr.Key)
 				if keyRule != nil && keyRule.Action != ActionRetain {
 					decisions = append(decisions, e.sensitiveKeyDecision(rawPath, originalAttr.Key, *keyRule))
@@ -118,9 +122,11 @@ func (e *Evaluator) evaluateAttribute(path string, attr model.Attribute) (model.
 		return attr, []Decision{decision}, false, nil
 	}
 	if e.shouldInspectJSON(path, attr.ValueType) {
-		if rule := e.winner(path, attr.Value); rule != nil && rule.Action != ActionRetain &&
-			(rule.Path != "*" || rule.valueRE == nil) {
-			transformed, decision, keep := e.applyScalar(path, attr.ValueType, attr.Value)
+		// Global value-pattern masks must not shadow a structural field action.
+		// For example, a credential inside gen_ai.input.messages is masked as a
+		// nested value, but the parent field still has to be dropped in full.
+		if rule := e.winnerJSONFieldAction(path, attr.Value); rule != nil && rule.Action != ActionRetain {
+			transformed, decision, keep := e.applyRule(path, attr.ValueType, attr.Value, rule)
 			attr.Value = transformed
 			if rule.Action != ActionRetain {
 				attr.ValueType = "str"
@@ -238,6 +244,10 @@ func (e *Evaluator) walkJSON(path string, value any, depth int) (any, bool, []De
 
 func (e *Evaluator) applyScalar(path, valueType, value string) (string, Decision, bool) {
 	rule := e.winner(path, value)
+	return e.applyRule(path, valueType, value, rule)
+}
+
+func (e *Evaluator) applyRule(path, valueType, value string, rule *compiledRule) (string, Decision, bool) {
 	if rule == nil {
 		rule = implicitRule("implicit.retain", ActionRetain, "custom", "No policy rule matched; the applied copy retains the field while preview hides its raw value.", 0)
 	}
@@ -299,6 +309,23 @@ func (e *Evaluator) applyScalar(path, valueType, value string) (string, Decision
 		decision.Preview = "<dropped:unknown>"
 		return "", decision, false
 	}
+}
+
+func (e *Evaluator) winnerJSONFieldAction(path, value string) *compiledRule {
+	for i := range e.rules {
+		rule := &e.rules[i]
+		if !rule.pathRE.MatchString(path) {
+			continue
+		}
+		if rule.valueRE != nil && !rule.valueRE.MatchString(value) {
+			continue
+		}
+		if rule.Path == "*" && rule.valueRE != nil {
+			continue
+		}
+		return rule
+	}
+	return nil
 }
 
 func (e *Evaluator) maskRemainingCandidates(path, value, winningRuleID string) string {

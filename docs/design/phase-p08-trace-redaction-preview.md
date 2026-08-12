@@ -102,7 +102,7 @@ No original value, reveal token, encryption key, reversible map, or escrow refer
 ## Non-mutation and network boundary
 
 - Imported traces are decoded from an already-open read-only file descriptor and never rewritten.
-- Stored traces resolve the configured path to an absolute SQLite file URI and use `mode=ro` with normal locking, busy handling, and change detection; the path must already exist. No directory creation or migration is permitted, and previews do not write the database.
+- Stored traces resolve the configured path to an absolute SQLite file URI and use `mode=ro` with normal locking, busy handling, and change detection; the path must already exist. No directory creation or migration is permitted, previews do not write the database, and a pre-span-link schema remains readable with unavailable diagnostics and links represented as empty legacy data.
 - Tests hash the source file and database plus sidecar presence/content before and after preview.
 - The evaluator uses only Go's standard library and embedded policy bytes. It has no network client, provider, secret lookup, or environment-dependent rule fetch.
 

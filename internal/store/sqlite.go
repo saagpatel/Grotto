@@ -30,7 +30,8 @@ func DefaultDBPath() (string, error) {
 
 // Store is a handle to Grotto's SQLite-backed trace history.
 type Store struct {
-	db *sql.DB
+	db                *sql.DB
+	hasSpanLinkSchema bool
 }
 
 // Open opens (creating if necessary) the SQLite database at path and applies the
@@ -60,7 +61,7 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("apply schema: %w", err)
 	}
-	return &Store{db: db}, nil
+	return &Store{db: db, hasSpanLinkSchema: true}, nil
 }
 
 // OpenReadOnly opens an existing SQLite database without creating directories
@@ -88,7 +89,25 @@ func OpenReadOnly(ctx context.Context, path string) (*Store, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("ping sqlite read-only %q: %w", path, err)
 	}
-	return &Store{db: db}, nil
+	hasSpanLinkSchema, err := detectSpanLinkSchema(ctx, db)
+	if err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("inspect sqlite read-only schema %q: %w", path, err)
+	}
+	return &Store{db: db, hasSpanLinkSchema: hasSpanLinkSchema}, nil
+}
+
+func detectSpanLinkSchema(ctx context.Context, db *sql.DB) (bool, error) {
+	const query = `
+		SELECT COUNT(*)
+		FROM sqlite_schema
+		WHERE type = 'table'
+		  AND name IN ('span_diagnostics', 'span_links', 'span_link_attributes')`
+	var count int
+	if err := db.QueryRowContext(ctx, query).Scan(&count); err != nil {
+		return false, fmt.Errorf("query span-link schema: %w", err)
+	}
+	return count == 3, nil
 }
 
 // Close releases the underlying database handle.

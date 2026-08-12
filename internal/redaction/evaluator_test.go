@@ -3,6 +3,7 @@ package redaction
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -61,6 +62,30 @@ func TestDefaultEvaluator_CoversSensitiveTraceFieldsWithoutRawReportContent(t *t
 	assert.True(t, strings.HasPrefix(attrs["blob"].Value, "sha256:v1:"))
 	assert.Equal(t, "ordinary metadata", attrs["custom.safe"].Value)
 	assert.NotContains(t, attrs["payload"].Value, "fake-nested-token")
+}
+
+func TestDefaultEvaluator_FieldDropSurvivesNestedSecretMask(t *testing.T) {
+	evaluator, err := DefaultEvaluator()
+	require.NoError(t, err)
+	secret := "sk-" + strings.Repeat("P", 24)
+	privatePrompt := "private prompt must not survive"
+	trace := traceWithAttrs(model.Attribute{
+		Key:       "gen_ai.input.messages",
+		ValueType: "json",
+		Value:     fmt.Sprintf(`[{"role":"user","content":%q,"token":%q}]`, privatePrompt, secret),
+	})
+
+	result, err := evaluator.Evaluate(trace, Options{SourceKind: "test", SourceRef: "field-drop"})
+	require.NoError(t, err)
+	assert.NotContains(t, attrsByKey(result.Trace.Spans[0].Attributes), "gen_ai.input.messages")
+
+	var report bytes.Buffer
+	require.NoError(t, WriteJSON(&report, result.Report))
+	assert.NotContains(t, report.String(), secret)
+	assert.NotContains(t, report.String(), privatePrompt)
+	require.Len(t, result.Report.Decisions, 4)
+	assert.Equal(t, "genai.messages", result.Report.Decisions[0].MatchedRule)
+	assert.Equal(t, ActionDrop, result.Report.Decisions[0].Action)
 }
 
 func TestRulePrecedence_AllowlistAndLexicalTieBreakAreDeterministic(t *testing.T) {

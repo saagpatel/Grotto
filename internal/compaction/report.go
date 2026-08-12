@@ -460,7 +460,9 @@ func linkTargets(traceID string, item *workingObservation, all []workingObservat
 	var externalLinks []model.SpanLink
 	for _, link := range item.span.Links {
 		if link.TraceID != traceID {
-			externalLinks = append(externalLinks, link)
+			if externalResponseID(link) != "" {
+				externalLinks = append(externalLinks, link)
+			}
 			continue
 		}
 		for _, candidate := range all {
@@ -471,6 +473,15 @@ func linkTargets(traceID string, item *workingObservation, all []workingObservat
 		}
 	}
 	return linkedTargets, externalLinks
+}
+
+func externalResponseID(link model.SpanLink) string {
+	for _, attr := range link.Attributes {
+		if attr.Key == attrResponseID && attr.Value != "" {
+			return attr.Value
+		}
+	}
+	return ""
 }
 
 func resolveContinuity(traceID string, item *workingObservation, all []workingObservation, byResponse map[string]int, duplicateResponseIDs map[string]struct{}, children map[string]int, warnings *[]Warning) {

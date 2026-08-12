@@ -450,15 +450,20 @@ Policy V1 evaluator at the single `InsertTrace` chokepoint. The policy preserves
 the legacy AWS, GitHub, OpenAI-style, and Slack credential protections and adds
 field-by-field handling for authorization headers, cookies, email/home-path/URL
 data, GenAI content, nested JSON, binary values, and size/depth bounds. P06 span
-link attributes pass through the same evaluator, while safe numeric token and
-context measurements remain available to P06 and P09; higher-priority credential
-patterns still mask secret-shaped values even in measurement fields.
+link trace-state and attributes pass through the same evaluator, while safe
+numeric token and context measurements remain available to P06 and P09;
+higher-priority credential patterns still mask secret-shaped values even in
+measurement fields. Whole-field rules such as GenAI message drops are applied
+before nested value masks, so a credential inside a private payload cannot make
+the surrounding payload reportable.
 
 `grotto redact-preview` uses that same evaluator against imported JSON or a
 locking read-only SQLite connection with normal change detection. Report paths
 pseudonymize instrumentation-supplied attribute and JSON keys, output is
-raw-content-off, and there is no reveal mode. See [privacy](docs/privacy.md),
-[policy](docs/redaction-policy.md), and the
+raw-content-off, and there is no reveal mode. Read-only preview also accepts the
+pre-span-link schema without applying migrations; unavailable diagnostics and
+links remain empty rather than making the legacy trace unreadable. See
+[privacy](docs/privacy.md), [policy](docs/redaction-policy.md), and the
 [five-minute demo](docs/demo-redaction-preview.md).
 
 ---

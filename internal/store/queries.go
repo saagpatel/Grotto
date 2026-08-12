@@ -46,6 +46,12 @@ FROM spans s
 LEFT JOIN span_diagnostics d ON d.span_id = s.span_id
 WHERE s.trace_id = ? ORDER BY s.started_ns, s.span_id`
 
+const selectLegacySpansSQL = `
+SELECT s.span_id, s.parent_span_id, s.name, s.kind, s.status_code,
+       s.started_ns, s.ended_ns, s.duration_ns, 0, 0
+FROM spans s
+WHERE s.trace_id = ? ORDER BY s.started_ns, s.span_id`
+
 const selectAttrsSQL = `
 SELECT a.span_id, a.key, a.value_type, a.value
 FROM span_attributes a
@@ -170,7 +176,11 @@ func (s *Store) GetTrace(ctx context.Context, traceID string) (model.Trace, erro
 // each span's attributes. Attributes are fetched for the whole trace in one
 // query to avoid an N+1 round trip; spans with no attributes keep a nil slice.
 func (s *Store) loadSpans(ctx context.Context, traceID string) ([]model.Span, error) {
-	rows, err := s.db.QueryContext(ctx, selectSpansSQL, traceID)
+	query := selectSpansSQL
+	if !s.hasSpanLinkSchema {
+		query = selectLegacySpansSQL
+	}
+	rows, err := s.db.QueryContext(ctx, query, traceID)
 	if err != nil {
 		return nil, fmt.Errorf("query spans for %q: %w", traceID, err)
 	}
@@ -206,12 +216,14 @@ func (s *Store) loadSpans(ctx context.Context, traceID string) ([]model.Span, er
 	for i := range spans {
 		spans[i].Attributes = attrsBySpan[spans[i].SpanID]
 	}
-	linksBySpan, err := s.loadLinks(ctx, traceID)
-	if err != nil {
-		return nil, err
-	}
-	for i := range spans {
-		spans[i].Links = linksBySpan[spans[i].SpanID]
+	if s.hasSpanLinkSchema {
+		linksBySpan, err := s.loadLinks(ctx, traceID)
+		if err != nil {
+			return nil, err
+		}
+		for i := range spans {
+			spans[i].Links = linksBySpan[spans[i].SpanID]
+		}
 	}
 	return spans, nil
 }
