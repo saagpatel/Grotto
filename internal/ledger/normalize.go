@@ -45,6 +45,7 @@ const (
 type candidate struct {
 	value   int64
 	sources []Source
+	valid   bool
 }
 
 type rowState struct {
@@ -190,7 +191,7 @@ func normalizeUsage(spanID string, attrs map[string]model.Attribute, issues *[]I
 		output = append(output, collectCandidates(spanID, attrs, []keyFamily{{attrAnthropicOutput, "anthropic"}}, issues)...)
 		cacheRead = append(cacheRead, collectCandidates(spanID, attrs, []keyFamily{{attrAnthropicCacheRead, "anthropic"}}, issues)...)
 		cacheWrite = append(cacheWrite, collectCandidates(spanID, attrs, []keyFamily{{attrAnthropicCacheWrite, "anthropic"}}, issues)...)
-		if derived, ok := anthropicInputCandidate(spanID, attrs, issues); ok {
+		if derived, ok := anthropicInputCandidate(spanID, attrs, issues); ok || len(derived.sources) > 0 {
 			input = append(input, derived)
 		}
 	}
@@ -203,20 +204,7 @@ func normalizeUsage(spanID string, attrs map[string]model.Attribute, issues *[]I
 		Reasoning:  resolveCount("reasoning", spanID, reasoning, issues),
 		ToolInput:  resolveCount("tool_input", spanID, toolInput, issues),
 	}
-	u.CacheRead = enforceSubset(spanID, "cache_read_exceeds_input", u.CacheRead, u.Input, issues)
-	u.CacheWrite = enforceSubset(spanID, "cache_write_exceeds_input", u.CacheWrite, u.Input, issues)
-	if isKnown(u.CacheRead) && isKnown(u.CacheWrite) && isKnown(u.Input) {
-		cacheTotal, overflow := checkedAdd(*u.CacheRead.Value, *u.CacheWrite.Value)
-		if overflow || cacheTotal > *u.Input.Value {
-			*issues = append(*issues, Issue{Code: "cache_subsets_exceed_input", SpanID: spanID, Message: "cache-read plus cache-write exceeds input total"})
-			u.CacheRead.Status, u.CacheRead.Value, u.CacheRead.Reason = "unknown", nil, "impossible_partition"
-			u.CacheWrite.Status, u.CacheWrite.Value, u.CacheWrite.Reason = "unknown", nil, "impossible_partition"
-		}
-	}
-	u.Reasoning = enforceSubset(spanID, "reasoning_exceeds_output", u.Reasoning, u.Output, issues)
-	u.ToolInput = enforceSubset(spanID, "tool_input_exceeds_input", u.ToolInput, u.Input, issues)
-	u.Total = addCounts(u.Input, u.Output, "input_or_output_unknown", spanID, issues)
-	return u, usageBearing
+	return enforceUsageInvariants(spanID, u, issues), usageBearing
 }
 
 type keyFamily struct{ key, family string }
@@ -224,7 +212,7 @@ type keyFamily struct{ key, family string }
 func collectCandidates(spanID string, attrs map[string]model.Attribute, keys []keyFamily, issues *[]Issue) []candidate {
 	out := make([]candidate, 0, len(keys))
 	for _, item := range keys {
-		if c, ok := parseCandidate(spanID, attrs, item.key, item.family, issues); ok {
+		if c, ok := parseCandidate(spanID, attrs, item.key, item.family, issues); ok || len(c.sources) > 0 {
 			out = append(out, c)
 		}
 	}
@@ -239,24 +227,24 @@ func parseCandidate(spanID string, attrs map[string]model.Attribute, key, family
 	source := Source{Attribute: key, Value: a.Value, ValueType: a.ValueType, Family: family}
 	if a.ValueType != "int" {
 		*issues = append(*issues, Issue{Code: "invalid_attribute_type", SpanID: spanID, Attribute: key, Message: fmt.Sprintf("token count requires int, got %q", a.ValueType)})
-		return candidate{}, false
+		return candidate{sources: []Source{source}}, false
 	}
 	value, err := strconv.ParseInt(a.Value, 10, 64)
 	if err != nil {
 		*issues = append(*issues, Issue{Code: "invalid_integer", SpanID: spanID, Attribute: key, Message: "token count is not a signed 64-bit integer"})
-		return candidate{}, false
+		return candidate{sources: []Source{source}}, false
 	}
 	if value < 0 {
 		*issues = append(*issues, Issue{Code: "negative_count", SpanID: spanID, Attribute: key, Message: "token count cannot be negative"})
-		return candidate{}, false
+		return candidate{sources: []Source{source}}, false
 	}
-	return candidate{value: value, sources: []Source{source}}, true
+	return candidate{value: value, sources: []Source{source}, valid: true}, true
 }
 
 func anthropicInputCandidate(spanID string, attrs map[string]model.Attribute, issues *[]Issue) (candidate, bool) {
 	base, ok := parseCandidate(spanID, attrs, attrAnthropicInput, "anthropic", issues)
 	if !ok {
-		return candidate{}, false
+		return base, false
 	}
 	value := base.value
 	sources := append([]Source(nil), base.sources...)
@@ -266,20 +254,20 @@ func anthropicInputCandidate(spanID string, attrs map[string]model.Attribute, is
 		}
 		part, valid := parseCandidate(spanID, attrs, key, "anthropic", issues)
 		if !valid {
-			return candidate{}, false
+			return candidate{sources: append(sources, part.sources...)}, false
 		}
 		var overflow bool
 		value, overflow = checkedAdd(value, part.value)
 		if overflow {
 			*issues = append(*issues, Issue{Code: "count_overflow", SpanID: spanID, Attribute: attrAnthropicInput, Message: "Anthropic input plus cache tokens exceeds int64"})
-			return candidate{}, false
+			return candidate{sources: append(sources, part.sources...)}, false
 		}
 		sources = append(sources, part.sources...)
 	}
 	for i := range sources {
 		sources[i].Derived = "anthropic input + cache read + cache creation"
 	}
-	return candidate{value: value, sources: sources}, true
+	return candidate{value: value, sources: sources, valid: true}, true
 }
 
 func resolveCount(signal, spanID string, candidates []candidate, issues *[]Issue) Count {
@@ -288,11 +276,19 @@ func resolveCount(signal, spanID string, candidates []candidate, issues *[]Issue
 	}
 	allSources := make([]Source, 0)
 	values := make(map[int64]struct{})
+	rejected := false
 	for _, c := range candidates {
-		values[c.value] = struct{}{}
 		allSources = append(allSources, c.sources...)
+		if !c.valid {
+			rejected = true
+			continue
+		}
+		values[c.value] = struct{}{}
 	}
 	sortSources(allSources)
+	if rejected {
+		return Count{Status: "unknown", Value: nil, Reason: "rejected_observation", Sources: allSources}
+	}
 	if len(values) != 1 {
 		*issues = append(*issues, Issue{Code: "conflicting_usage", SpanID: spanID, Message: signal + " candidates disagree"})
 		return Count{Status: "unknown", Value: nil, Reason: "conflict", Sources: allSources}
@@ -313,6 +309,23 @@ func enforceSubset(spanID, code string, subset, total Count, issues *[]Issue) Co
 	subset.Value = nil
 	subset.Reason = "impossible_subset"
 	return subset
+}
+
+func enforceUsageInvariants(spanID string, usage Usage, issues *[]Issue) Usage {
+	usage.CacheRead = enforceSubset(spanID, "cache_read_exceeds_input", usage.CacheRead, usage.Input, issues)
+	usage.CacheWrite = enforceSubset(spanID, "cache_write_exceeds_input", usage.CacheWrite, usage.Input, issues)
+	if isKnown(usage.CacheRead) && isKnown(usage.CacheWrite) && isKnown(usage.Input) {
+		cacheTotal, overflow := checkedAdd(*usage.CacheRead.Value, *usage.CacheWrite.Value)
+		if overflow || cacheTotal > *usage.Input.Value {
+			*issues = append(*issues, Issue{Code: "cache_subsets_exceed_input", SpanID: spanID, Message: "cache-read plus cache-write exceeds input total"})
+			usage.CacheRead.Status, usage.CacheRead.Value, usage.CacheRead.Reason = "unknown", nil, "impossible_partition"
+			usage.CacheWrite.Status, usage.CacheWrite.Value, usage.CacheWrite.Reason = "unknown", nil, "impossible_partition"
+		}
+	}
+	usage.Reasoning = enforceSubset(spanID, "reasoning_exceeds_output", usage.Reasoning, usage.Output, issues)
+	usage.ToolInput = enforceSubset(spanID, "tool_input_exceeds_input", usage.ToolInput, usage.Input, issues)
+	usage.Total = addCounts(usage.Input, usage.Output, "input_or_output_unknown", spanID, issues)
+	return usage
 }
 
 func applyContributionModes(states []rowState, issues *[]Issue) {
@@ -357,8 +370,7 @@ func subtractUsage(spanID string, current, prior Usage, issues *[]Issue) Usage {
 		Reasoning:  subtractCount(spanID, "reasoning", current.Reasoning, prior.Reasoning, issues),
 		ToolInput:  subtractCount(spanID, "tool_input", current.ToolInput, prior.ToolInput, issues),
 	}
-	out.Total = addCounts(out.Input, out.Output, "input_or_output_unknown", spanID, issues)
-	return out
+	return enforceUsageInvariants(spanID, out, issues)
 }
 
 func subtractCount(spanID, signal string, current, prior Count, issues *[]Issue) Count {
@@ -410,8 +422,11 @@ func aggregateSignal(states []rowState, selectCount func(Usage) Count, signal st
 		if !state.row.Contributes || !state.usageBearing {
 			continue
 		}
-		seen = true
 		count := selectCount(state.row.Contribution)
+		if len(count.Sources) == 0 {
+			continue
+		}
+		seen = true
 		if !isKnown(count) {
 			unknown = true
 			sources = append(sources, count.Sources...)
@@ -440,7 +455,7 @@ func aggregateSignal(states []rowState, selectCount func(Usage) Count, signal st
 		}
 		count := selectCount(state.row.Observed)
 		if isKnown(count) {
-			rollups = append(rollups, candidate{value: *count.Value, sources: count.Sources})
+			rollups = append(rollups, candidate{value: *count.Value, sources: count.Sources, valid: true})
 		}
 	}
 	if len(rollups) == 0 {
@@ -492,8 +507,11 @@ func reconcileRollups(states []rowState, issues *[]Issue) {
 				if !child.row.Contributes || !child.usageBearing || !isDescendant(child.row.SpanID, state.row.SpanID, byID) {
 					continue
 				}
-				seen = true
 				count := signal.fn(child.row.Contribution)
+				if len(count.Sources) == 0 {
+					continue
+				}
+				seen = true
 				if !isKnown(count) {
 					complete = false
 					continue

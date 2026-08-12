@@ -139,10 +139,20 @@ func ApplyRates(report *Report, book *RateBook) {
 	}
 	estimate := Estimate{Status: "unknown", Provenance: book.provenance}
 	total := new(big.Rat)
+	pricedUsage := false
 	for _, row := range report.Rows {
-		if !row.Contributes || !hasObservedUsage(row.Observed) {
+		if !hasObservedUsage(row.Observed) {
 			continue
 		}
+		if !row.Contributes {
+			if row.Mode == "rollup" {
+				continue
+			}
+			estimate.Reason = row.SpanID + ": usage observation is excluded from contributions"
+			report.Summary.Estimate = &estimate
+			return
+		}
+		pricedUsage = true
 		entry, ok := book.match(row.Provider, row.Model)
 		if !ok {
 			estimate.Reason = "missing rate for " + row.Provider + "/" + row.Model
@@ -156,6 +166,11 @@ func ApplyRates(report *Report, book *RateBook) {
 			return
 		}
 		total.Add(total, amount)
+	}
+	if !pricedUsage {
+		estimate.Reason = "no estimable usage observations"
+		report.Summary.Estimate = &estimate
+		return
 	}
 	amount := formatRat(total)
 	estimate.Status = "known"

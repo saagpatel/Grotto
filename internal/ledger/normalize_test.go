@@ -175,6 +175,93 @@ func TestRateFileMalformedAndMissingMatchStayClosed(t *testing.T) {
 	assert.Nil(t, report.Summary.Estimate.Amount)
 }
 
+func TestApplyRates_MissingAndMalformedUsageRemainUnknown(t *testing.T) {
+	book, err := LoadRates(filepath.Join("testdata", "rates.json"))
+	require.NoError(t, err)
+
+	t.Run("missing usage", func(t *testing.T) {
+		report := Build(model.Trace{TraceID: "missing", Spans: []model.Span{{SpanID: "root", Name: "root"}}})
+		ApplyRates(&report, book)
+		require.NotNil(t, report.Summary.Estimate)
+		assert.Equal(t, "unknown", report.Summary.Estimate.Status)
+		assert.Nil(t, report.Summary.Estimate.Amount)
+		assert.Contains(t, report.Summary.Estimate.Reason, "no estimable usage")
+	})
+
+	t.Run("malformed usage", func(t *testing.T) {
+		span := model.Span{SpanID: "bad", Name: "bad", Attributes: []model.Attribute{
+			{Key: attrProvider, ValueType: "str", Value: "openai"},
+			{Key: attrResponseModel, ValueType: "str", Value: "gpt-fixture"},
+			{Key: attrInput, ValueType: "int", Value: "not-an-integer"},
+		}}
+		report := Build(model.Trace{TraceID: "malformed", Spans: []model.Span{span}})
+		ApplyRates(&report, book)
+		require.NotNil(t, report.Summary.Estimate)
+		assert.Equal(t, "unknown", report.Summary.Estimate.Status)
+		assert.Nil(t, report.Summary.Estimate.Amount)
+		assert.Contains(t, report.Summary.Estimate.Reason, "usage components are unknown")
+	})
+}
+
+func TestAggregateSignal_UsesRollupWhenOnlyUnrelatedChildSignalsExist(t *testing.T) {
+	rollupAttrs := completeUsageAttrs("100", "20")
+	rollupAttrs[attrCacheRead] = "40"
+	rollupAttrs[attrUsageMode] = "rollup"
+	root := usageSpan("root", "", 0, rollupAttrs)
+	child := usageSpan("child", "root", 1, map[string]string{attrInput: "10", attrOutput: "2"})
+
+	report := Build(model.Trace{TraceID: "per-signal-rollup", Spans: []model.Span{root, child}})
+	assertCount(t, report.Summary.Usage.Input, 10)
+	assertCount(t, report.Summary.Usage.Output, 2)
+	assertCount(t, report.Summary.Usage.CacheRead, 40)
+}
+
+func TestCumulativeDelta_RevalidatesSubsetInvariants(t *testing.T) {
+	firstAttrs := completeUsageAttrs("100", "20")
+	firstAttrs[attrCacheRead] = "90"
+	firstAttrs[attrUsageMode] = "cumulative"
+	firstAttrs[attrUsageSeries] = "series"
+	secondAttrs := completeUsageAttrs("110", "25")
+	secondAttrs[attrCacheRead] = "105"
+	secondAttrs[attrUsageMode] = "cumulative"
+	secondAttrs[attrUsageSeries] = "series"
+
+	report := Build(model.Trace{TraceID: "cumulative-subset", Spans: []model.Span{
+		usageSpan("first", "", 1, firstAttrs),
+		usageSpan("second", "", 2, secondAttrs),
+	}})
+	second := findRow(t, report, "second")
+	assertCount(t, second.Contribution.Input, 10)
+	assert.Equal(t, "unknown", second.Contribution.CacheRead.Status)
+	assert.Nil(t, second.Contribution.CacheRead.Value)
+	assert.Contains(t, StableIssueCodes(report), "cache_read_exceeds_input")
+}
+
+func TestRejectedUsageAttributesPreserveExactSourceProvenance(t *testing.T) {
+	span := model.Span{SpanID: "rejected", Name: "rejected", Attributes: []model.Attribute{
+		{Key: attrInput, ValueType: "str", Value: "twelve"},
+		{Key: attrOutput, ValueType: "int", Value: "not-an-integer"},
+		{Key: attrCacheRead, ValueType: "int", Value: "-1"},
+	}}
+	report := Build(model.Trace{TraceID: "rejected", Spans: []model.Span{span}})
+	row := findRow(t, report, "rejected")
+
+	for _, tc := range []struct {
+		count     Count
+		attribute string
+		value     string
+		valueType string
+	}{
+		{row.Observed.Input, attrInput, "twelve", "str"},
+		{row.Observed.Output, attrOutput, "not-an-integer", "int"},
+		{row.Observed.CacheRead, attrCacheRead, "-1", "int"},
+	} {
+		require.Equal(t, "unknown", tc.count.Status)
+		require.Len(t, tc.count.Sources, 1)
+		assert.Equal(t, Source{Attribute: tc.attribute, Value: tc.value, ValueType: tc.valueType, Family: "otel"}, tc.count.Sources[0])
+	}
+}
+
 func TestRenderingAndReportBytesAreDeterministic(t *testing.T) {
 	tr := loadTraceFixture(t, "agent_trace.json")
 	first, second := Build(tr), Build(tr)
