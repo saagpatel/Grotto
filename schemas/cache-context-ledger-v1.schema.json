@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/saagpatel/Grotto/schemas/cache-context-ledger-v1.schema.json",
+  "title": "Grotto Cache and Context Ledger V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "semconv", "trace_id", "run_label", "source", "summary", "rows", "issues"],
+  "properties": {
+    "schema": {"const": "grotto.cache_context_ledger.v1"},
+    "semconv": {"$ref": "#/$defs/semconv"},
+    "trace_id": {"type": "string"},
+    "run_label": {"type": "string"},
+    "source": {"type": "string"},
+    "summary": {"$ref": "#/$defs/summary"},
+    "rows": {"type": "array", "items": {"$ref": "#/$defs/row"}},
+    "issues": {"type": "array", "items": {"$ref": "#/$defs/issue"}}
+  },
+  "$defs": {
+    "semconv": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "core", "gen_ai_ref"],
+      "properties": {
+        "status": {"const": "development"},
+        "core": {"type": "string"},
+        "gen_ai_ref": {"type": "string"}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attribute", "value", "value_type", "family"],
+      "properties": {
+        "attribute": {"type": "string"},
+        "value": {"type": "string"},
+        "value_type": {"type": "string"},
+        "family": {"type": "string"},
+        "derived": {"type": "string"}
+      }
+    },
+    "count": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "value"],
+      "properties": {
+        "status": {"enum": ["known", "unknown"]},
+        "value": {"type": ["integer", "null"], "minimum": 0},
+        "reason": {"type": "string"},
+        "sources": {"type": "array", "items": {"$ref": "#/$defs/source"}}
+      },
+      "allOf": [
+        {"if": {"properties": {"status": {"const": "known"}}}, "then": {"properties": {"value": {"type": "integer"}}}},
+        {"if": {"properties": {"status": {"const": "unknown"}}}, "then": {"properties": {"value": {"type": "null"}}}}
+      ]
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input", "output", "cache_read", "cache_write", "reasoning", "tool_input", "total"],
+      "properties": {
+        "input": {"$ref": "#/$defs/count"},
+        "output": {"$ref": "#/$defs/count"},
+        "cache_read": {"$ref": "#/$defs/count"},
+        "cache_write": {"$ref": "#/$defs/count"},
+        "reasoning": {"$ref": "#/$defs/count"},
+        "tool_input": {"$ref": "#/$defs/count"},
+        "total": {"$ref": "#/$defs/count"}
+      }
+    },
+    "retry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "logical_call_id": {"type": "string"},
+        "attempt": {"type": "integer", "minimum": 1}
+      }
+    },
+    "row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["span_id", "name", "started_ns", "ended_ns", "depth", "mode", "tool_call", "retry", "observed", "contribution", "contributes"],
+      "properties": {
+        "span_id": {"type": "string"},
+        "parent_span_id": {"type": "string"},
+        "name": {"type": "string"},
+        "started_ns": {"type": "integer"},
+        "ended_ns": {"type": "integer"},
+        "depth": {"type": "integer", "minimum": 0},
+        "branch_span_id": {"type": "string"},
+        "provider": {"type": "string"},
+        "model": {"type": "string"},
+        "operation": {"type": "string"},
+        "mode": {"enum": ["delta", "cumulative", "rollup", "invalid"]},
+        "series": {"type": "string"},
+        "tool_call": {"type": "boolean"},
+        "retry": {"$ref": "#/$defs/retry"},
+        "observed": {"$ref": "#/$defs/usage"},
+        "contribution": {"$ref": "#/$defs/usage"},
+        "contributes": {"type": "boolean"}
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "limit", "used", "ratio"],
+      "properties": {
+        "status": {"enum": ["known", "unknown"]},
+        "limit": {"$ref": "#/$defs/count"},
+        "used": {"$ref": "#/$defs/count"},
+        "ratio": {"type": ["number", "null"], "minimum": 0},
+        "reason": {"type": "string"}
+      }
+    },
+    "rate_provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "schema", "as_of", "currency"],
+      "properties": {
+        "path": {"type": "string"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "schema": {"const": "grotto.token_rates.v1"},
+        "as_of": {"type": "string"},
+        "currency": {"type": "string"}
+      }
+    },
+    "estimate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "amount", "provenance"],
+      "properties": {
+        "status": {"enum": ["known", "unknown"]},
+        "amount": {"type": ["string", "null"]},
+        "reason": {"type": "string"},
+        "provenance": {"$ref": "#/$defs/rate_provenance"}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["span_count", "usage_rows", "tool_calls", "retry_attempts", "usage", "context"],
+      "properties": {
+        "span_count": {"type": "integer", "minimum": 0},
+        "usage_rows": {"type": "integer", "minimum": 0},
+        "tool_calls": {"type": "integer", "minimum": 0},
+        "retry_attempts": {"type": "integer", "minimum": 0},
+        "usage": {"$ref": "#/$defs/usage"},
+        "context": {"$ref": "#/$defs/context"},
+        "estimate": {"$ref": "#/$defs/estimate"}
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {"type": "string"},
+        "span_id": {"type": "string"},
+        "attribute": {"type": "string"},
+        "message": {"type": "string"}
+      }
+    }
+  }
+}

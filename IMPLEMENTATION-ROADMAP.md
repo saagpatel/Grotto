@@ -336,3 +336,27 @@ repository format, test, static-build, and available lint gates are green.
 4. Synthetic fixtures cover headers, credentials, cookies, emails, home paths, URL queries, GenAI inputs/outputs, tool payloads, exceptions, nested/malformed JSON, binary/oversized values, allowlists, custom attributes, and conflicts.
 5. Focused tests prove precedence, idempotence, source/database byte stability, deterministic digests, Unicode and depth bounds, false-positive controls, no raw-secret output, and no network dependency.
 6. `gofmt`, `go test ./...`, `CGO_ENABLED=0 go build ./...`, and `golangci-lint run ./...` (when available) pass, with a reproducible five-minute demo documented.
+
+---
+
+## Phase P09: Cache and Context Ledger (selected 2026-08-11)
+
+**Objective:** Explain input, output, reasoning, cache-read, cache-write, tool,
+and explicitly supplied context-window token signals across an agent trace with
+raw-attribute provenance, deterministic causal aggregation, reconciliation, and
+`UNKNOWN` instead of guesses.
+
+**Ownership:** P09 owns `internal/ledger/**`, its schemas, fixtures, tests, and
+the minimal `grotto show` integration. P06 retains compaction visualization;
+P08 retains redaction preview. All paths continue through genuine OTel spans,
+the existing SQLite store, and existing renderer/CLI architecture.
+
+**Locked constraints:** no provider calls, no baked or browsed runtime prices,
+no cgo, no alternate trace store, and no double counting of cache/reasoning
+subsets. Monetary estimates require an explicit versioned user rate file with
+as-of provenance.
+
+**Design and acceptance:** See
+[`P09-CACHE-CONTEXT-LEDGER-DESIGN.md`](P09-CACHE-CONTEXT-LEDGER-DESIGN.md).
+The phase ends only when the synthetic OTel fixture deterministically reconciles
+known totals back to exact source attributes and the full repository gates pass.

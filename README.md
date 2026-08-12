@@ -352,6 +352,56 @@ grotto redact-preview --file tests/fixtures/redaction/synthetic-trace.json --jso
 grotto tui
 ```
 
+### Explain agent token, cache, tool, and context usage
+
+`grotto show <trace-id> --ledger` projects the stored OTel spans into a causal
+per-span usage ledger. It normalizes input/output totals plus cache-read,
+cache-write, reasoning, and explicitly annotated tool-input subsets; groups
+retries without erasing their usage; preserves parallel branch attribution; and
+reports conflicts, duplicate observations, invalid counts, cumulative decreases,
+and unexplained rollup deltas.
+
+```bash
+# Human-readable causal rows and concise trace summary
+grotto show <trace-id> --ledger
+
+# Versioned machine-readable report with exact raw-attribute provenance
+grotto show <trace-id> --ledger-json
+
+# Optional estimate from an explicit local user-authored rate file
+grotto show <trace-id> --ledger --ledger-rates ./rates.json
+```
+
+Token accounting is always primary. Grotto contains no prices and performs no
+pricing or provider network calls. Estimates exist only when
+`--ledger-rates` supplies a valid `grotto.token_rates.v1` file; the report keeps
+its path, SHA-256 digest, schema, currency, and as-of value. Context pressure is
+shown only when a positive `grotto.context.window.limit_tokens` attribute is
+actually present. Missing values remain `UNKNOWN`.
+
+#### Five-minute deterministic P09 demo
+
+From the repository root, seed the synthetic OTel-shaped fixture into the same
+SQLite store used by normal capture, then exercise both report forms:
+
+```bash
+p09_demo_dir="$(mktemp -d)"
+export GROTTO_DB="$p09_demo_dir/grotto.db"
+
+go run ./internal/ledger/testdata/seed
+go run ./cmd/grotto show 09090909090909090909090909090909 --ledger
+go run ./cmd/grotto show 09090909090909090909090909090909 --ledger-json
+go run ./cmd/grotto show 09090909090909090909090909090909 \
+  --ledger --ledger-rates internal/ledger/testdata/rates.json
+```
+
+The fixture covers uncached and cached calls, cache writes, OpenAI and Anthropic
+semantics, reasoning, tool execution, retries, parallel branches, compaction-
+adjacent spans, cumulative samples, rollups, zero values, and out-of-order
+ingest. See [`P09-CACHE-CONTEXT-LEDGER-DESIGN.md`](P09-CACHE-CONTEXT-LEDGER-DESIGN.md)
+for the field mapping, upstream Development status, schemas, reconciliation
+rules, and claim ceiling.
+
 `--json` keeps raw nanosecond fields for scripts, but renders OTel enums as labels
 instead of integers: span `kind` values are `internal`, `server`, `client`,
 `producer`, `consumer`, or `unspecified`; `status` values are `unset`, `ok`, or

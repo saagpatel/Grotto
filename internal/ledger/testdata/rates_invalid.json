@@ -1,0 +1,6 @@
+{
+  "schema": "grotto.token_rates.v1",
+  "as_of": "not-a-date",
+  "currency": "USD",
+  "rates": [{"provider": "openai", "model": "gpt-fixture", "per_million_tokens": {"input": "-1", "output": "4"}}]
+}
