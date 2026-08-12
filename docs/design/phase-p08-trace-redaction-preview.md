@@ -90,7 +90,7 @@ Actions are:
 
 `grotto.redaction-preview.v1` contains policy provenance and digest, evaluator version, source kind/reference, trace ID, deterministic action totals, `UNKNOWN` totals, and path-sorted field decisions. Each decision contains:
 
-- canonical field path and category;
+- canonical structural path plus stable opaque references for untrusted attribute/JSON keys, and category;
 - matched rule ID and rule provenance;
 - action and explanation;
 - original type and byte length;
@@ -102,7 +102,7 @@ No original value, reveal token, encryption key, reversible map, or escrow refer
 ## Non-mutation and network boundary
 
 - Imported traces are decoded from an already-open read-only file descriptor and never rewritten.
-- Stored traces use SQLite URI `mode=ro&immutable=1`; the path must already exist. No directory creation, migrations, WAL, journal, or pragma write is permitted.
+- Stored traces resolve the configured path to an absolute SQLite file URI and use `mode=ro` with normal locking, busy handling, and change detection; the path must already exist. No directory creation or migration is permitted, and previews do not write the database.
 - Tests hash the source file and database plus sidecar presence/content before and after preview.
 - The evaluator uses only Go's standard library and embedded policy bytes. It has no network client, provider, secret lookup, or environment-dependent rule fetch.
 

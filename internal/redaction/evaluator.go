@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,6 +22,8 @@ const (
 	retainedPreview = "<retained>"
 	maxPreviewBytes = 160
 )
+
+var quotedPathKeyRE = regexp.MustCompile(`\["(?:\\.|[^"\\])*"\]`)
 
 // Evaluate returns a transformed copy and the exact raw-content-off plan used
 // to create it. The input trace and its slices are never modified.
@@ -224,7 +227,7 @@ func (e *Evaluator) applyScalar(path, valueType, value string) (string, Decision
 	}
 
 	decision := Decision{
-		Path: path, Category: rule.Category, MatchedRule: rule.ID,
+		Path: safeDecisionPath(path), Category: rule.Category, MatchedRule: rule.ID,
 		RuleProvenance: rule.Provenance, Action: rule.Action,
 		Explanation: rule.Explanation,
 		Precedence: fmt.Sprintf("priority=%d;literal=%d;wildcards=%d;rule_id=%s",
@@ -333,12 +336,25 @@ func (e *Evaluator) sensitiveKeyDecision(_ string, key string, rule compiledRule
 
 func (e *Evaluator) unknownDecision(path, valueType string, length int, ruleID, reason, explanation string) Decision {
 	return Decision{
-		Path: path, Category: "unknown", MatchedRule: ruleID,
+		Path: safeDecisionPath(path), Category: "unknown", MatchedRule: ruleID,
 		RuleProvenance: "evaluator.fail-closed", Action: ActionDrop,
 		Explanation: explanation, Precedence: "implicit fail-closed safety bound",
 		OriginalType: valueType, OriginalLengthBytes: length,
 		Preview: "<dropped:unknown>", Status: "unknown", UnknownReason: reason,
 	}
+}
+
+func safeDecisionPath(path string) string {
+	return quotedPathKeyRE.ReplaceAllStringFunc(path, func(segment string) string {
+		quotedKey := segment[1 : len(segment)-1]
+		key, err := strconv.Unquote(quotedKey)
+		if err != nil {
+			key = segment
+		}
+		digest := stableDigest(key)
+		shortDigest := digest[len("sha256:v1:") : len("sha256:v1:")+12]
+		return `["<field:` + shortDigest + `>"]`
+	})
 }
 
 func (e *Evaluator) safeMetadata(value string) string {

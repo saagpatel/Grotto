@@ -18,6 +18,9 @@ Rules match canonical, case-insensitive paths with `*` and `?` globs:
 - `spans[0].attributes["payload"].json["nested"]["token"]`
 
 Array indexes are concrete in reports and can be wildcarded in policy paths.
+Policy matching uses these canonical keys internally. Reports replace every
+instrumentation-supplied attribute or nested JSON key with a stable opaque
+`<field:…>` reference so a data-derived key cannot disclose personal data.
 
 ## Precedence
 

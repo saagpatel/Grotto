@@ -17,8 +17,8 @@ import (
 const maxImportedTraceBytes = 16 * 1024 * 1024
 
 // newRedactPreviewCmd builds the non-mutating redaction disclosure preview.
-// Stored traces use a read-only immutable SQLite connection; imported traces
-// are read once and never rewritten. There is deliberately no reveal flag.
+// Stored traces use a locking read-only SQLite connection; imported traces are
+// read once and never rewritten. There is deliberately no reveal flag.
 func newRedactPreviewCmd() *cobra.Command {
 	var (
 		filePath   string

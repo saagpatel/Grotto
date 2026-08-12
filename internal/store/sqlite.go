@@ -63,14 +63,21 @@ func Open(ctx context.Context, path string) (*Store, error) {
 	return &Store{db: db}, nil
 }
 
-// OpenReadOnly opens an existing SQLite database without creating directories,
-// applying migrations, or allowing SQLite journals/WAL sidecars. immutable=1 is
-// appropriate for a bounded preview that promises byte-stable source state.
+// OpenReadOnly opens an existing SQLite database without creating directories
+// or applying migrations. It keeps SQLite locking and change detection enabled
+// so a preview can safely coexist with a writer and observe later commits.
 func OpenReadOnly(ctx context.Context, path string) (*Store, error) {
-	if _, err := os.Stat(path); err != nil {
+	absolutePath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("resolve sqlite read-only path %q: %w", path, err)
+	}
+	if _, err := os.Stat(absolutePath); err != nil {
 		return nil, fmt.Errorf("stat sqlite %q: %w", path, err)
 	}
-	dsnURL := &url.URL{Scheme: "file", Path: path, RawQuery: "mode=ro&immutable=1"}
+	query := url.Values{}
+	query.Set("mode", "ro")
+	query.Set("_pragma", "busy_timeout(5000)")
+	dsnURL := &url.URL{Scheme: "file", Path: absolutePath, RawQuery: query.Encode()}
 	dsn := dsnURL.String()
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {

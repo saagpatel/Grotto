@@ -87,6 +87,43 @@ func TestOpenReadOnly_DoesNotChangeDatabaseOrCreateSidecars(t *testing.T) {
 	assert.Equal(t, beforeSidecars, afterSidecars)
 }
 
+func TestOpenReadOnly_ResolvesRelativeDatabasePath(t *testing.T) {
+	t.Chdir(t.TempDir())
+	const path = "relative-preview.db"
+	ctx := t.Context()
+	st, err := Open(ctx, path)
+	require.NoError(t, err)
+	require.NoError(t, st.InsertTrace(ctx, minimalTrace("relative", "fixture", 1)))
+	require.NoError(t, st.Close())
+
+	ro, err := OpenReadOnly(ctx, path)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, ro.Close()) })
+	got, err := ro.GetTrace(ctx, "relative")
+	require.NoError(t, err)
+	assert.Equal(t, "relative", got.TraceID)
+}
+
+func TestOpenReadOnly_ObservesLaterCommittedTrace(t *testing.T) {
+	ctx := t.Context()
+	path := filepath.Join(t.TempDir(), "live-preview.db")
+	writer, err := Open(ctx, path)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, writer.Close()) })
+	require.NoError(t, writer.InsertTrace(ctx, minimalTrace("before", "fixture", 1)))
+
+	ro, err := OpenReadOnly(ctx, path)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, ro.Close()) })
+	_, err = ro.GetTrace(ctx, "before")
+	require.NoError(t, err)
+
+	require.NoError(t, writer.InsertTrace(ctx, minimalTrace("after", "fixture", 2)))
+	got, err := ro.GetTrace(ctx, "after")
+	require.NoError(t, err)
+	assert.Equal(t, "after", got.TraceID)
+}
+
 func fileDigest(t *testing.T, path string) string {
 	t.Helper()
 	b, err := os.ReadFile(path)
