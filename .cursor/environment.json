@@ -1,4 +1,4 @@
 {
   "disableAllMcpServers": true,
-  "install": "GOTOOLCHAIN=local CGO_ENABLED=0 go test -count=1 ./... && GOTOOLCHAIN=local CGO_ENABLED=0 go build ./..."
+  "install": "GOTOOLCHAIN=go1.25.0 CGO_ENABLED=0 go test -count=1 ./... && GOTOOLCHAIN=go1.25.0 CGO_ENABLED=0 go build ./..."
 }
