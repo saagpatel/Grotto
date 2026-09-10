@@ -28,6 +28,11 @@ type CriticalPath struct {
 // Each unit's earliest finish is its own duration plus the latest finish among
 // its predecessors; the critical path ends at the latest-finishing unit and is
 // recovered by walking those predecessor links back to a source.
+//
+// This text-path helper stays byte-stable for `grotto show --critical-path`,
+// including its graceful cycle termination. The versioned JSON contract
+// (AnalyzeCriticalPath) classifies no-edge, missing, cyclic, and malformed
+// graphs explicitly and does not invent a path.
 func ComputeCriticalPath(tr model.Trace) (CriticalPath, bool) {
 	spanByUnit := make(map[int]model.Span)
 	unblocks := make(map[int][]int)

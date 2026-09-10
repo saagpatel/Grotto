@@ -1,0 +1,34 @@
+{
+  "trace_id": "no-edge",
+  "run_label": "marks build",
+  "source": "mark",
+  "root_name": "build",
+  "started_ns": 0,
+  "ended_ns": 200,
+  "duration_ns": 200,
+  "span_count": 2,
+  "spans": [
+    {
+      "span_id": "root",
+      "trace_id": "no-edge",
+      "parent_span_id": "",
+      "name": "build",
+      "kind": "internal",
+      "status": "ok",
+      "started_ns": 0,
+      "ended_ns": 200,
+      "duration_ns": 200
+    },
+    {
+      "span_id": "compile",
+      "trace_id": "no-edge",
+      "parent_span_id": "root",
+      "name": "compile",
+      "kind": "internal",
+      "status": "ok",
+      "started_ns": 0,
+      "ended_ns": 200,
+      "duration_ns": 200
+    }
+  ]
+}

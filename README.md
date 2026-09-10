@@ -215,6 +215,7 @@ A waterfall shows *where* time went; the critical path shows the *one chain you'
 
 ```bash
 grotto show <trace-id> --critical-path
+grotto show <trace-id> --critical-path-json
 ```
 
 ```
@@ -227,6 +228,8 @@ critical path  1.82s  (the build's floor)
 ```
 
 Read it as a story: 6.78s of compile *work* ran in 2.97s of wall-clock thanks to parallelism, but it can't drop below **1.82s** because `serde_derive` (a proc-macro) can't compile until `syn` finishes, and `serde` can't expand its derives until `serde_derive` finishes. Throwing more cores at this build won't help — shortening that chain (or the proc-macro) will. (Only `--adapter=cargo` traces carry dependency edges; the flag degrades with a clear message on other traces.)
+
+`--critical-path-json` emits the versioned `grotto.critical_path.v1` contract: ordered path spans and path metrics reconstructed from stored `cargo.unit` / `cargo.unblocks` edges. No-edge, missing, cyclic, and malformed graphs are explicit statuses; the report does not invent a path. See [`schemas/critical-path-v1.schema.json`](schemas/critical-path-v1.schema.json). The proof limit is the stored cargo DAG only — not live cargo scheduling, ingest, or a second span model.
 
 #### Frontend vs codegen: why a crate is slow
 
@@ -340,6 +343,9 @@ grotto show <trace-id>
 
 # Raw JSON (spans + attributes)
 grotto show <trace-id> --json
+
+# Versioned critical-path JSON from the stored cargo DAG
+grotto show <trace-id> --critical-path-json
 
 # Per-span duration delta between two runs
 grotto diff <trace-id-a> <trace-id-b>

@@ -1,0 +1,23 @@
+{
+  "schema": "grotto.critical_path.v1",
+  "trace_id": "no-edge",
+  "run_label": "marks build",
+  "source": "mark",
+  "status": "no_edge",
+  "spans": [],
+  "metrics": {
+    "critical_ns": null,
+    "total_work_ns": 0,
+    "wall_clock_ns": 200,
+    "unit_count": 0,
+    "path_span_count": 0,
+    "edge_count": 0
+  },
+  "issues": [
+    {
+      "code": "no_edge",
+      "message": "no cargo.unit attributes; trace has no reconstructable dependency graph"
+    }
+  ],
+  "claim_ceiling": "longest-duration chain through stored cargo.unit/cargo.unblocks edges; no path is emitted for no-edge, missing, cyclic, or malformed graphs"
+}

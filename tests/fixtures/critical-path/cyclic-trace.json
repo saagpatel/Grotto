@@ -1,0 +1,42 @@
+{
+  "trace_id": "cyclic",
+  "run_label": "cyclic cargo",
+  "source": "cargo",
+  "root_name": "cargo",
+  "started_ns": 0,
+  "ended_ns": 200,
+  "duration_ns": 200,
+  "span_count": 2,
+  "spans": [
+    {
+      "span_id": "A",
+      "trace_id": "cyclic",
+      "parent_span_id": "",
+      "name": "A",
+      "kind": "internal",
+      "status": "ok",
+      "started_ns": 0,
+      "ended_ns": 100,
+      "duration_ns": 100,
+      "attributes": [
+        {"key": "cargo.unit", "value_type": "int", "value": "0"},
+        {"key": "cargo.unblocks", "value_type": "str", "value": "1"}
+      ]
+    },
+    {
+      "span_id": "B",
+      "trace_id": "cyclic",
+      "parent_span_id": "",
+      "name": "B",
+      "kind": "internal",
+      "status": "ok",
+      "started_ns": 0,
+      "ended_ns": 100,
+      "duration_ns": 100,
+      "attributes": [
+        {"key": "cargo.unit", "value_type": "int", "value": "1"},
+        {"key": "cargo.unblocks", "value_type": "str", "value": "0"}
+      ]
+    }
+  ]
+}

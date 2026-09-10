@@ -1,0 +1,23 @@
+{
+  "schema": "grotto.critical_path.v1",
+  "trace_id": "cyclic",
+  "run_label": "cyclic cargo",
+  "source": "cargo",
+  "status": "cyclic",
+  "spans": [],
+  "metrics": {
+    "critical_ns": null,
+    "total_work_ns": 200,
+    "wall_clock_ns": 200,
+    "unit_count": 2,
+    "path_span_count": 0,
+    "edge_count": 2
+  },
+  "issues": [
+    {
+      "code": "cycle",
+      "message": "cycle involves units 0,1"
+    }
+  ],
+  "claim_ceiling": "longest-duration chain through stored cargo.unit/cargo.unblocks edges; no path is emitted for no-edge, missing, cyclic, or malformed graphs"
+}

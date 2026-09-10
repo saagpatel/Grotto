@@ -1,0 +1,25 @@
+{
+  "schema": "grotto.critical_path.v1",
+  "trace_id": "missing",
+  "run_label": "missing unit cargo",
+  "source": "cargo",
+  "status": "missing",
+  "spans": [],
+  "metrics": {
+    "critical_ns": null,
+    "total_work_ns": 300,
+    "wall_clock_ns": 300,
+    "unit_count": 2,
+    "path_span_count": 0,
+    "edge_count": 1
+  },
+  "issues": [
+    {
+      "code": "missing_unit",
+      "span_id": "A",
+      "unit": 99,
+      "message": "unit 0 unblocks missing unit 99"
+    }
+  ],
+  "claim_ceiling": "longest-duration chain through stored cargo.unit/cargo.unblocks edges; no path is emitted for no-edge, missing, cyclic, or malformed graphs"
+}
