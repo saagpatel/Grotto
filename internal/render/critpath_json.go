@@ -371,17 +371,18 @@ func parseCargoUnit(s model.Span) (int, bool, error) {
 	return 0, false, nil
 }
 
-func parseCargoUnblocks(s model.Span) (targets []int, bad []string, present bool) {
+func parseCargoUnblocks(s model.Span) ([]int, []string, bool) {
 	for _, a := range s.Attributes {
 		if a.Key != attrCargoUnblocks {
 			continue
 		}
-		present = true
 		if strings.TrimSpace(a.Value) == "" {
 			return nil, []string{a.Value}, true
 		}
 		parts := strings.Split(a.Value, ",")
 		seen := make(map[int]struct{})
+		var targets []int
+		var bad []string
 		for _, part := range parts {
 			tok := strings.TrimSpace(part)
 			i, err := strconv.Atoi(tok)
