@@ -1,0 +1,41 @@
+{
+  "trace_id": "missing",
+  "run_label": "missing unit cargo",
+  "source": "cargo",
+  "root_name": "cargo",
+  "started_ns": 0,
+  "ended_ns": 300,
+  "duration_ns": 300,
+  "span_count": 2,
+  "spans": [
+    {
+      "span_id": "A",
+      "trace_id": "missing",
+      "parent_span_id": "",
+      "name": "A",
+      "kind": "internal",
+      "status": "ok",
+      "started_ns": 0,
+      "ended_ns": 100,
+      "duration_ns": 100,
+      "attributes": [
+        {"key": "cargo.unit", "value_type": "int", "value": "0"},
+        {"key": "cargo.unblocks", "value_type": "str", "value": "1,99"}
+      ]
+    },
+    {
+      "span_id": "B",
+      "trace_id": "missing",
+      "parent_span_id": "",
+      "name": "B",
+      "kind": "internal",
+      "status": "ok",
+      "started_ns": 100,
+      "ended_ns": 300,
+      "duration_ns": 200,
+      "attributes": [
+        {"key": "cargo.unit", "value_type": "int", "value": "1"}
+      ]
+    }
+  ]
+}

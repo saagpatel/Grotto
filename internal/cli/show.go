@@ -17,6 +17,7 @@ func newShowCmd() *cobra.Command {
 	var asJSON bool
 	var limit int
 	var criticalPath bool
+	var criticalPathJSON bool
 	var sections bool
 	var asLedger bool
 	var asLedgerJSON bool
@@ -57,6 +58,9 @@ func newShowCmd() *cobra.Command {
 				}
 				return ledger.WriteText(cmd.OutOrStdout(), report)
 			}
+			if criticalPathJSON {
+				return render.WriteCriticalPathJSON(cmd.OutOrStdout(), render.AnalyzeCriticalPath(tr))
+			}
 			if criticalPath {
 				return render.WriteCriticalPath(cmd.OutOrStdout(), tr)
 			}
@@ -73,6 +77,8 @@ func newShowCmd() *cobra.Command {
 		"max rows per parent before the long tail collapses into a bucket (0 shows all)")
 	cmd.Flags().BoolVar(&criticalPath, "critical-path", false,
 		"show the longest dependency chain (build floor) instead of the waterfall; cargo-adapter traces only")
+	cmd.Flags().BoolVar(&criticalPathJSON, "critical-path-json", false,
+		"output the versioned grotto.critical_path.v1 report instead of the waterfall")
 	cmd.Flags().BoolVar(&sections, "sections", false,
 		"show cargo per-crate frontend/codegen sub-phases nested under each crate")
 	cmd.Flags().BoolVar(&asLedger, "ledger", false,
@@ -82,8 +88,9 @@ func newShowCmd() *cobra.Command {
 	cmd.Flags().StringVar(&ledgerRates, "ledger-rates", "",
 		"local versioned user-supplied rate file for optional estimates")
 	// These select different renderings; combining them would silently pick one.
-	cmd.MarkFlagsMutuallyExclusive("json", "critical-path", "ledger", "ledger-json")
+	cmd.MarkFlagsMutuallyExclusive("json", "critical-path", "critical-path-json", "ledger", "ledger-json")
 	cmd.MarkFlagsMutuallyExclusive("critical-path", "sections")
+	cmd.MarkFlagsMutuallyExclusive("critical-path-json", "sections")
 	cmd.MarkFlagsMutuallyExclusive("ledger", "sections")
 	cmd.MarkFlagsMutuallyExclusive("ledger-json", "sections")
 	return cmd

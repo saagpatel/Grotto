@@ -1,0 +1,40 @@
+{
+  "schema": "grotto.critical_path.v1",
+  "trace_id": "malformed",
+  "run_label": "malformed cargo",
+  "source": "cargo",
+  "status": "malformed",
+  "spans": [],
+  "metrics": {
+    "critical_ns": null,
+    "total_work_ns": 50,
+    "wall_clock_ns": 50,
+    "unit_count": 1,
+    "path_span_count": 0,
+    "edge_count": 0
+  },
+  "issues": [
+    {
+      "code": "duplicate_unit",
+      "span_id": "A-dup",
+      "unit": 0,
+      "message": "cargo.unit 0 duplicated (first span A)"
+    },
+    {
+      "code": "invalid_unblocks",
+      "span_id": "bad",
+      "message": "cargo.unblocks token \"x\" is not a non-negative integer"
+    },
+    {
+      "code": "invalid_unit",
+      "span_id": "bad",
+      "message": "cargo.unit value \"nope\" is not a non-negative integer"
+    },
+    {
+      "code": "unblocks_without_unit",
+      "span_id": "bad",
+      "message": "cargo.unblocks present without a valid cargo.unit"
+    }
+  ],
+  "claim_ceiling": "longest-duration chain through stored cargo.unit/cargo.unblocks edges; no path is emitted for no-edge, missing, cyclic, or malformed graphs"
+}

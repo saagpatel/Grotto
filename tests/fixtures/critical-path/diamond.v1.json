@@ -1,0 +1,46 @@
+{
+  "schema": "grotto.critical_path.v1",
+  "trace_id": "diamond",
+  "run_label": "diamond cargo",
+  "source": "cargo",
+  "status": "ok",
+  "spans": [
+    {
+      "index": 0,
+      "unit": 0,
+      "span_id": "A",
+      "name": "A",
+      "started_ns": 0,
+      "ended_ns": 100,
+      "duration_ns": 100
+    },
+    {
+      "index": 1,
+      "unit": 1,
+      "span_id": "B",
+      "name": "B",
+      "started_ns": 100,
+      "ended_ns": 400,
+      "duration_ns": 300
+    },
+    {
+      "index": 2,
+      "unit": 3,
+      "span_id": "D",
+      "name": "D",
+      "started_ns": 400,
+      "ended_ns": 500,
+      "duration_ns": 100
+    }
+  ],
+  "metrics": {
+    "critical_ns": 500,
+    "total_work_ns": 550,
+    "wall_clock_ns": 500,
+    "unit_count": 4,
+    "path_span_count": 3,
+    "edge_count": 4
+  },
+  "issues": [],
+  "claim_ceiling": "longest-duration chain through stored cargo.unit/cargo.unblocks edges; no path is emitted for no-edge, missing, cyclic, or malformed graphs"
+}

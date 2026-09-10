@@ -1,0 +1,55 @@
+{
+  "trace_id": "malformed",
+  "run_label": "malformed cargo",
+  "source": "cargo",
+  "root_name": "cargo",
+  "started_ns": 0,
+  "ended_ns": 50,
+  "duration_ns": 50,
+  "span_count": 3,
+  "spans": [
+    {
+      "span_id": "A",
+      "trace_id": "malformed",
+      "parent_span_id": "",
+      "name": "A",
+      "kind": "internal",
+      "status": "ok",
+      "started_ns": 0,
+      "ended_ns": 50,
+      "duration_ns": 50,
+      "attributes": [
+        {"key": "cargo.unit", "value_type": "int", "value": "0"}
+      ]
+    },
+    {
+      "span_id": "A-dup",
+      "trace_id": "malformed",
+      "parent_span_id": "",
+      "name": "A duplicate",
+      "kind": "internal",
+      "status": "ok",
+      "started_ns": 0,
+      "ended_ns": 40,
+      "duration_ns": 40,
+      "attributes": [
+        {"key": "cargo.unit", "value_type": "int", "value": "0"}
+      ]
+    },
+    {
+      "span_id": "bad",
+      "trace_id": "malformed",
+      "parent_span_id": "",
+      "name": "bad unit",
+      "kind": "internal",
+      "status": "ok",
+      "started_ns": 0,
+      "ended_ns": 10,
+      "duration_ns": 10,
+      "attributes": [
+        {"key": "cargo.unit", "value_type": "int", "value": "nope"},
+        {"key": "cargo.unblocks", "value_type": "str", "value": "x"}
+      ]
+    }
+  ]
+}

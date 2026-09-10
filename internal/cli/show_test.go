@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/saagpatel/grotto/internal/adapter"
 	"github.com/saagpatel/grotto/internal/ledger"
 	"github.com/saagpatel/grotto/internal/model"
+	"github.com/saagpatel/grotto/internal/render"
 	"github.com/saagpatel/grotto/internal/store"
 )
 
@@ -93,4 +95,141 @@ func TestShowLedgerFlagValidation(t *testing.T) {
 	err = mutual.Execute()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "none of the others can be")
+}
+
+func TestShowCriticalPathJSON(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "grotto.db")
+	t.Setenv("GROTTO_DB", dbPath)
+	ctx := context.Background()
+	st, err := store.Open(ctx, dbPath)
+	require.NoError(t, err)
+	tr := model.Trace{
+		TraceID: "crit-cli", RunLabel: "diamond cargo", Source: "cargo", RootName: "cargo",
+		StartedNs: 0, EndedNs: 500, DurationNs: 500, SpanCount: 4,
+		Spans: []model.Span{
+			cliUnitSpan("crit-cli", 0, "A", 0, 100, 1, 2),
+			cliUnitSpan("crit-cli", 1, "B", 100, 300, 3),
+			cliUnitSpan("crit-cli", 2, "C", 100, 50, 3),
+			cliUnitSpan("crit-cli", 3, "D", 400, 100),
+		},
+	}
+	require.NoError(t, st.InsertTrace(ctx, tr))
+	require.NoError(t, st.Close())
+
+	jsonCmd := newShowCmd()
+	var jsonOut bytes.Buffer
+	jsonCmd.SetOut(&jsonOut)
+	jsonCmd.SetArgs([]string{"crit-cli", "--critical-path-json"})
+	require.NoError(t, jsonCmd.Execute())
+	var report render.CriticalPathReport
+	require.NoError(t, json.Unmarshal(jsonOut.Bytes(), &report))
+	assert.Equal(t, render.CriticalPathSchema, report.Schema)
+	require.NoError(t, render.ValidateCriticalPathReport(report))
+	assert.Equal(t, "ok", report.Status)
+	assert.Equal(t, []string{"A", "B", "D"}, []string{report.Spans[0].Name, report.Spans[1].Name, report.Spans[2].Name})
+
+	textCmd := newShowCmd()
+	var textOut bytes.Buffer
+	textCmd.SetOut(&textOut)
+	textCmd.SetArgs([]string{"crit-cli", "--critical-path"})
+	require.NoError(t, textCmd.Execute())
+	assert.Contains(t, textOut.String(), "critical path")
+	assert.NotContains(t, textOut.String(), `"schema"`)
+
+	rawCmd := newShowCmd()
+	var rawOut bytes.Buffer
+	rawCmd.SetOut(&rawOut)
+	rawCmd.SetArgs([]string{"crit-cli", "--json"})
+	require.NoError(t, rawCmd.Execute())
+	assert.Contains(t, rawOut.String(), `"trace_id": "crit-cli"`)
+	assert.Contains(t, rawOut.String(), `"span_count"`)
+	assert.NotContains(t, rawOut.String(), render.CriticalPathSchema)
+}
+
+func TestShowCriticalPathJSON_NoEdgeAndMalformed(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "grotto.db")
+	t.Setenv("GROTTO_DB", dbPath)
+	ctx := context.Background()
+	st, err := store.Open(ctx, dbPath)
+	require.NoError(t, err)
+	noEdge := model.Trace{
+		TraceID: "no-edge-cli", RunLabel: "marks", Source: "mark", RootName: "build",
+		StartedNs: 0, EndedNs: 10, DurationNs: 10, SpanCount: 1,
+		Spans: []model.Span{{
+			SpanID: "root", TraceID: "no-edge-cli", Name: "build", StartedNs: 0, EndedNs: 10, DurationNs: 10,
+		}},
+	}
+	malformed := model.Trace{
+		TraceID: "malformed-cli", RunLabel: "bad cargo", Source: "cargo", RootName: "cargo",
+		StartedNs: 0, EndedNs: 10, DurationNs: 10, SpanCount: 2,
+		Spans: []model.Span{
+			cliUnitSpan("malformed-cli", 0, "A", 0, 10),
+			{
+				SpanID: "dup", TraceID: "malformed-cli", Name: "A2", StartedNs: 0, EndedNs: 5, DurationNs: 5,
+				Attributes: []model.Attribute{{Key: "cargo.unit", ValueType: "int", Value: "0"}},
+			},
+		},
+	}
+	require.NoError(t, st.InsertTrace(ctx, noEdge))
+	require.NoError(t, st.InsertTrace(ctx, malformed))
+	require.NoError(t, st.Close())
+
+	noEdgeCmd := newShowCmd()
+	var noEdgeOut bytes.Buffer
+	noEdgeCmd.SetOut(&noEdgeOut)
+	noEdgeCmd.SetArgs([]string{"no-edge-cli", "--critical-path-json"})
+	require.NoError(t, noEdgeCmd.Execute())
+	var noEdgeReport render.CriticalPathReport
+	require.NoError(t, json.Unmarshal(noEdgeOut.Bytes(), &noEdgeReport))
+	assert.Equal(t, "no_edge", noEdgeReport.Status)
+	assert.Empty(t, noEdgeReport.Spans)
+	require.NoError(t, render.ValidateCriticalPathReport(noEdgeReport))
+
+	textCmd := newShowCmd()
+	var textOut bytes.Buffer
+	textCmd.SetOut(&textOut)
+	textCmd.SetArgs([]string{"no-edge-cli", "--critical-path"})
+	require.NoError(t, textCmd.Execute())
+	assert.Contains(t, textOut.String(), "no dependency edges")
+
+	malformedCmd := newShowCmd()
+	var malformedOut bytes.Buffer
+	malformedCmd.SetOut(&malformedOut)
+	malformedCmd.SetArgs([]string{"malformed-cli", "--critical-path-json"})
+	require.NoError(t, malformedCmd.Execute())
+	var malformedReport render.CriticalPathReport
+	require.NoError(t, json.Unmarshal(malformedOut.Bytes(), &malformedReport))
+	assert.Equal(t, "malformed", malformedReport.Status)
+	assert.Empty(t, malformedReport.Spans)
+	require.NoError(t, render.ValidateCriticalPathReport(malformedReport))
+}
+
+func TestShowCriticalPathJSONFlagValidation(t *testing.T) {
+	mutual := newShowCmd()
+	mutual.SetArgs([]string{"trace", "--json", "--critical-path-json"})
+	err := mutual.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "none of the others can be")
+
+	withText := newShowCmd()
+	withText.SetArgs([]string{"trace", "--critical-path", "--critical-path-json"})
+	err = withText.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "none of the others can be")
+}
+
+func cliUnitSpan(traceID string, idx int, name string, start, dur int64, unblocks ...int) model.Span {
+	attrs := []model.Attribute{{Key: "cargo.unit", ValueType: "int", Value: strconv.Itoa(idx)}}
+	if len(unblocks) > 0 {
+		ids := make([]string, len(unblocks))
+		for i, u := range unblocks {
+			ids[i] = strconv.Itoa(u)
+		}
+		attrs = append(attrs, model.Attribute{Key: "cargo.unblocks", ValueType: "str", Value: strings.Join(ids, ",")})
+	}
+	return model.Span{
+		SpanID: name, TraceID: traceID, Name: name,
+		StartedNs: start, EndedNs: start + dur, DurationNs: dur,
+		Attributes: attrs,
+	}
 }
