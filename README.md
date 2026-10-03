@@ -62,7 +62,7 @@ go test ./internal/render -run '^TestLayout_OffsetsAndWidths$'
 go test ./...
 ```
 
-Cross-compiled static binaries (`dist/grotto-darwin-arm64`, `dist/grotto-linux-amd64`, each ~17 MB when stripped for release) are produced via `make build` / `make build-all`. The `CGO_ENABLED=0` gate is enforced from the first commit — any transitive cgo dependency is a hard build failure, not a warning.
+`make build` produces a stripped host-platform binary at `./grotto`. Cross-compiled static binaries (`dist/grotto-darwin-arm64`, `dist/grotto-linux-amd64`, each ~17 MB when stripped for release) are produced via `make build-all`. The `CGO_ENABLED=0` gate is enforced from the first commit — any transitive cgo dependency is a hard build failure, not a warning.
 
 ### Install the latest release
 
@@ -136,11 +136,11 @@ grotto mark "link"
 grotto mark "test"
 ```
 
-`grotto run` sets `GROTTO_SOCK` and `GROTTO_SPOOL` in the child's environment. Each `grotto mark <name>` call opens the socket, writes a JSON record, and waits for a one-byte acknowledgement — so the mark is durably held before the `grotto mark` process exits. If the socket is unreachable (e.g. nested subshell), the mark spools to `GROTTO_SPOOL` instead. N marks produce N child spans under one root span covering the full command duration.
+`grotto run` sets `GROTTO_SOCK` and `GROTTO_SPOOL` in the child's environment. Each `grotto mark <name>` call opens the socket, writes a JSON record, and waits for a one-byte acknowledgement — so the mark is recorded in collector memory before the `grotto mark` process exits; SQLite persistence happens after the wrapped command finishes. If the socket is unreachable (e.g. nested subshell), the mark spools to `GROTTO_SPOOL` instead. N marks produce N child spans under one root span covering the full command duration.
 
 ### Subdivide a section with `--child`
 
-A `grotto mark <name> --child` nests one level under the most recent non-child mark, subdividing that section — useful for breaking a coarse phase into its sub-steps. Any time inside a parent not covered by a marked child renders as a `(gap)` row, so unaccounted work (a `go vet` before the compile, setup before the first mark) stays visible instead of vanishing into the parent's bar.
+A `grotto mark <name> --child` nests one level under the most recent non-child mark, subdividing that section — useful for breaking a coarse phase into its sub-steps. Time inside a parent with children that is not covered by a marked child renders as a `(gap)` row when it meets the layout threshold (approximately one timeline character), so unaccounted work (a `go vet` before the compile, setup before the first mark) stays visible instead of vanishing into the parent's bar.
 
 ```bash
 grotto run -- tests/fixtures/nested-build-script.sh
@@ -190,7 +190,7 @@ grotto show <trace-id> --limit 0    # show every crate, no bucket
 grotto show <trace-id> --json       # full per-crate data, uncollapsed
 ```
 
-The interactive TUI (`grotto tui`) never collapses — you can scroll and inspect every crate. Adapters are pluggable; `cargo` is the Rust/build adapter.
+The interactive TUI (`grotto tui`) never automatically rolls up the long tail — you can scroll and inspect every crate or manually collapse subtrees. Adapters are pluggable; `cargo` is the Rust/build adapter.
 
 #### See what the cache saved: diff a cold build against a warm one
 
@@ -205,10 +205,10 @@ grotto diff <cold-id> <warm-id> --sort=delta
 ```
 total 3.66s → 39ms  (-3.62s)
   cargo                       3.66s → 39ms  -3.62s
-    serde_core v1.0.228        970ms → 0ns  -970ms
-    serde_derive v1.0.228      960ms → 0ns  -960ms
-    syn v2.0.117               740ms → 0ns  -740ms
-    serde_json v1.0.150        490ms → 0ns  -490ms
+-   serde_core v1.0.228  970ms
+-   serde_derive v1.0.228  960ms
+-   syn v2.0.117  740ms
+-   serde_json v1.0.150  490ms
 ```
 
 `--sort=delta` puts the biggest movers first (default is structural tree order). A crate that got *slower* between runs shows a `+` delta — handy for catching a dependency bump that regressed compile time.
@@ -231,13 +231,13 @@ critical path  1.82s  (the build's floor)
   critme v0.1.0         █  80ms
 ```
 
-Read it as a story: 6.78s of compile *work* ran in 2.97s of wall-clock thanks to parallelism, but it can't drop below **1.82s** because `serde_derive` (a proc-macro) can't compile until `syn` finishes, and `serde` can't expand its derives until `serde_derive` finishes. Throwing more cores at this build won't help — shortening that chain (or the proc-macro) will. (Only `--adapter=cargo` traces carry dependency edges; the flag degrades with a clear message on other traces.)
+Read it as a story: 6.78s of compile *work* ran in 2.97s of wall-clock thanks to parallelism, but it can't drop below **1.82s** because `serde_derive` (a proc-macro) can't compile until `syn` finishes, and `serde` can't expand its derives until `serde_derive` finishes. Throwing more cores at this build won't help — shortening that chain (or the proc-macro) will. (The cargo adapter supplies `cargo.unit` / `cargo.unblocks` dependency attributes; the flag degrades with a clear message on traces without them.)
 
 `--critical-path-json` emits the versioned `grotto.critical_path.v1` contract: ordered path spans and path metrics reconstructed from stored `cargo.unit` / `cargo.unblocks` edges. No-edge, missing, cyclic, and malformed graphs are explicit statuses; the report does not invent a path. See [`schemas/critical-path-v1.schema.json`](schemas/critical-path-v1.schema.json). The proof limit is the stored cargo DAG only — not live cargo scheduling, ingest, or a second span model.
 
 #### Frontend vs codegen: why a crate is slow
 
-cargo splits each crate's compile into a *frontend* phase (parse, type-check, borrow-check, macro expansion) and a *codegen* phase (LLVM codegen + optimization). Grotto stores both as sub-spans; `grotto show --sections` nests them under each crate:
+cargo splits each crate's compile into a *frontend* phase (parse, type-check, borrow-check, macro expansion) and a *codegen* phase (LLVM codegen + optimization). Grotto stores reported phases as sub-spans; `grotto show --sections` nests them under each crate:
 
 ```bash
 grotto show <trace-id> --sections
@@ -252,7 +252,7 @@ grotto show <trace-id> --sections
     codegen             █  90ms
 ```
 
-`serde_core` spends 94% of its time in the frontend — it's trait/generics-bound, so codegen optimization flags won't help it; a codegen-heavy crate is the opposite. The sub-phases are stored on every cargo trace (visible in `--json` and the interactive TUI) but hidden from the default waterfall to keep it uncluttered.
+`serde_core` spends 94% of its time in the frontend — it's trait/generics-bound, so codegen optimization flags won't help it; a codegen-heavy crate is the opposite. The sub-phases are stored when present in the cargo timing report (visible in `--json` and the interactive TUI) but hidden from the default waterfall to keep it uncluttered.
 
 ### Auto-instrument `go test` with `--adapter`
 
@@ -321,7 +321,7 @@ pytest                             ███████████████
     test_run_command                                         █████  190ms
 ```
 
-JUnit XML carries durations but not start times, so Grotto lays tests out sequentially within each suite. That is exact for serial pytest and approximate for parallel runners; the durations remain real. If you pass your own `--junitxml` in normal capture mode, Grotto overrides it with a warning so the adapter can reliably read the report it owns; use `--junit-file=PATH` when you want to preserve and import an existing artifact.
+JUnit XML carries durations but not start times, so Grotto lays tests out sequentially within each suite. The timing is synthesized even for serial pytest and approximate for parallel runners; reported durations are preserved unless clamped to the measured run window. If you pass your own `--junitxml` in normal capture mode, Grotto overrides it with a warning so the adapter can reliably read the report it owns; use `--junit-file=PATH` when you want to preserve and import an existing artifact.
 
 ### Receive OTLP spans from an instrumented app
 
@@ -334,7 +334,7 @@ grotto serve
 otel-cli span --endpoint localhost:4317 --name "my-span"
 ```
 
-The receiver binds `127.0.0.1` only. It warns on stderr if a non-loopback address is configured.
+The receiver binds `127.0.0.1` by default; `--grpc-addr` and `--http-addr` can override the bind addresses. It warns on stderr if a non-loopback address is configured.
 
 ### Inspect traces
 
@@ -419,7 +419,7 @@ instead of integers: span `kind` values are `internal`, `server`, `client`,
 
 ### TUI navigation
 
-`grotto tui` opens a three-screen Bubble Tea app. **Screen 1** (Run List) shows recent traces with label, span count, duration, and source (`mark` or `otlp`). Press `enter` to open the **Waterfall** view (Screen 2), which renders proportional bars with keyboard scroll and expand/collapse. Press `enter` on any span to open the **Inspector** (Screen 3), which shows the span's typed attributes, kind, status, and timing. `esc` returns up a level; `q` quits.
+`grotto tui` opens a three-screen Bubble Tea app. **Screen 1** (Run List) shows recent traces with label, span count, duration, and source (`mark`, `otlp`, or an adapter name such as `cargo`, `go-test`, or `junit`). Press `enter` to open the **Waterfall** view (Screen 2), which renders proportional bars with keyboard scroll and expand/collapse. Press `enter` on any span to open the **Inspector** (Screen 3), which shows the span's typed attributes, kind, status, and timing. `esc` returns up a level; `q` quits.
 
 ---
 
@@ -427,15 +427,15 @@ instead of integers: span `kind` values are `internal`, `server`, `client`,
 
 ### Genuine OTel shapes instead of homegrown timestamps
 
-The temptation on a project like this is to model "spans" as a simple pair of timestamps with a name. Grotto deliberately resists that — every span carries the full OTel shape: a 128-bit trace ID and 64-bit span ID in hex, a nullable `parent_span_id` (empty string for roots), a `SpanKind` (Internal/Server/Client/Producer/Consumer), a `StatusCode` (Unset/Ok/Error), nanosecond start/end times, and typed attributes (`str`, `int`, `float`, `bool`). This matters because the OTLP receiver maps real protobuf `ResourceSpans` into these types — if the internal model were simpler, something would have to be thrown away, and the mapping would be lying about what OTel actually carries.
+The temptation on a project like this is to model "spans" as a simple pair of timestamps with a name. Grotto deliberately resists that — every span carries an OTel-shaped subset: a 128-bit trace ID and 64-bit span ID in hex, a nullable `parent_span_id` (empty string for roots), a `SpanKind` (Internal/Server/Client/Producer/Consumer), a `StatusCode` (Unset/Ok/Error), nanosecond start/end times, and typed attributes (`str`, `int`, `float`, `bool`, `bytes`, `json`), plus span links and dropped-attribute/link counts. This matters because the OTLP receiver maps real protobuf `ResourceSpans` into these types — the mapping preserves these fields, but does not preserve span events, all resource/scope metadata, or the complete OTel span shape.
 
 ### Assembling a tree from a flat span list
 
-The SQLite store persists spans in a flat table with a `parent_span_id` foreign key. `AssembleTree` in `internal/model/span.go` reconstructs the parent/child hierarchy from that flat list: it builds a map from span ID to `*TreeNode`, iterates to wire children under parents, and then sorts each node's children by start time for deterministic rendering. The function is defensive against malformed input from both capture paths — duplicate span IDs (first wins), multiple root spans (first in input order wins), and orphaned or self-parented spans (dropped, never attached, so no cycle is reachable from the root). That defensive stance came from a real constraint: the OTLP receiver accepts spans from any exporter, not just ones Grotto emitted.
+The SQLite store persists spans in a flat table with a nullable `parent_span_id` column (not a foreign key). `AssembleTree` in `internal/model/span.go` reconstructs the parent/child hierarchy from that flat list: it builds a map from span ID to `*TreeNode`, iterates to wire children under parents, and then sorts each node's children by start time for deterministic rendering. The function is defensive against malformed input from both capture paths — duplicate span IDs (first wins), multiple root spans (first in input order wins), and orphaned or self-parented spans (dropped, never attached, so no cycle is reachable from the root). That defensive stance came from a real constraint: the OTLP receiver accepts spans from any exporter, not just ones Grotto emitted.
 
 ### The OTLP protobuf → internal model mapping
 
-`internal/otlp/mapproto.go` maps `otlp.proto`'s `ResourceSpans` → `ScopeSpans` → `Span` chain into `model.Span`. The interesting parts: span and trace IDs in the proto are raw `[]byte` and need to be hex-encoded to match what the marks path generates; attribute values are a protobuf oneof (`AnyValue`) that has to be type-switched to recover `str`/`int`/`float`/`bool` and store the type tag alongside the string representation; and `SpanKind` and `StatusCode` are proto enums that map 1:1 to the internal constants. Getting the attribute round-trip right — so `grotto show --json` emits the same typed value the exporter sent — required unit-testing the mapping against a fixture rather than trusting the obvious-looking code.
+`internal/otlp/mapproto.go` maps `otlp.proto`'s `ResourceSpans` → `ScopeSpans` → `Span` chain into `model.Span`. The interesting parts: span and trace IDs in the proto are raw `[]byte` and need to be hex-encoded to match what the marks path generates; attribute values are a protobuf oneof (`AnyValue`) that has to be type-switched to recover `str`/`int`/`float`/`bool` and store the type tag alongside the string representation; and `SpanKind` and `StatusCode` are proto enums that map 1:1 to the internal constants. The mapper also hex-encodes byte values and converts arrays/maps to best-effort strings. `grotto show --json` emits type tags with stringified values after ingest redaction; unit tests check the mapping against fixtures.
 
 ### Pure-Go SQLite as a hard constraint
 
@@ -443,17 +443,17 @@ The SQLite store persists spans in a flat table with a `parent_span_id` foreign 
 
 ### Single-writer SQLite to avoid lock contention
 
-The OTLP receiver runs two concurrent goroutines (gRPC server + HTTP handler). Both need to write spans to the same SQLite file. SQLite supports only one writer at a time, so naively opening the db from both would produce `database is locked` errors under load. The solution in `internal/store/sqlite.go` is `db.SetMaxOpenConns(1)` — the connection pool is capped to one, so the `database/sql` pool serializes all writes. The OTLP `Sink` in `internal/otlp/sink.go` adds a buffered channel in front of the store: receivers write to the channel, a single goroutine drains it to the store. This gives the gRPC and HTTP handlers non-blocking ingest while keeping the store single-writer.
+The OTLP receiver runs two concurrent goroutines (gRPC server + HTTP handler). Both need to write spans to the same SQLite file. SQLite supports only one writer at a time, so naively opening the db from both would produce `database is locked` errors under load. The solution in `internal/store/sqlite.go` is `db.SetMaxOpenConns(1)` — the connection pool is capped to one, so the `database/sql` pool serializes all writes. The OTLP `Sink` in `internal/otlp/sink.go` adds a buffered channel in front of the store: receivers write to the channel, a single goroutine drains it to the store. This decouples ingest from storage while keeping the store single-writer; submission blocks when the buffer is full.
 
 ### Go error wrapping, context, and goroutine ownership
 
-Coming from Rust (explicit `Result`) and Python (exceptions), Go's error model needed deliberate attention. The rule enforced throughout: every error that crosses a function boundary is wrapped with `%w` so callers can use `errors.Is`/`errors.As`. Errors are never silently swallowed — either returned or logged. Every blocking or IO function takes `context.Context` as its first parameter, and cancellation propagates through the exec'd child command (`exec.CommandContext`), the gRPC server, and the HTTP server shutdown. Every `go` statement has a named owner and a clear exit path — no fire-and-forget goroutines. The collector's concurrent mark handlers, the sink's drain goroutine, and the two OTLP server goroutines each have explicit `WaitGroup` or channel coordination to ensure clean shutdown.
+Coming from Rust (explicit `Result`) and Python (exceptions), Go's error model needed deliberate attention. The convention is to wrap errors with `%w` so callers can use `errors.Is`/`errors.As`; rendering helpers also return writer errors directly. OTLP sink storage failures are logged and `grotto run` returns them wrapped, while malformed marks and best-effort cleanup/acknowledgement errors may be ignored. Run, store, and receiver lifecycle APIs accept `context.Context`; mark emission instead uses bounded socket deadlines. Cancellation propagates through the exec'd child command (`exec.CommandContext`), the gRPC server, and the HTTP server shutdown. Every `go` statement has a named owner and a clear exit path — no fire-and-forget goroutines. The collector's concurrent mark handlers, the sink's drain goroutine, and the two OTLP server goroutines each have explicit `WaitGroup` or channel coordination to ensure clean shutdown.
 
 ---
 
 ## Security / privacy
 
-Grotto is local-only by design. The OTLP receiver binds `127.0.0.1` and is unauthenticated — this is deliberate for a developer tool, and Grotto warns on stderr if a non-loopback address is used. No trace data leaves the machine; the database lives at `~/.grotto/grotto.db` (overridable via `GROTTO_DB`).
+Grotto is local-only by design. The OTLP receiver binds `127.0.0.1` by default and is unauthenticated — this is deliberate for a developer tool, and Grotto warns on stderr if a non-loopback address is used. No trace data leaves the machine; the database lives at `~/.grotto/grotto.db` (overridable via `GROTTO_DB`).
 
 Before any trace is written to disk, `internal/store/redact.go` invokes the P08
 Policy V1 evaluator at the single `InsertTrace` chokepoint. The policy preserves
@@ -480,8 +480,8 @@ links remain empty rather than making the legacy trace unreadable. See
 
 ## Stack
 
-- **Go** 1.22+
+- **Go** 1.25.0+
 - **CLI** — [Cobra](https://github.com/spf13/cobra) 1.8+
-- **TUI** — [Bubble Tea](https://github.com/charmbracelet/bubbletea) 0.27+ / lipgloss / bubbles
-- **Tracing** — OpenTelemetry Go SDK 1.30+ · OTLP proto 1.3+ · gRPC 1.66+
+- **TUI** — [Bubble Tea](https://github.com/charmbracelet/bubbletea) 1.1+ / lipgloss / bubbles
+- **Tracing** — OpenTelemetry-shaped internal model · OTLP proto 1.3+ · gRPC 1.66+
 - **Storage** — [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite) 1.33+ (pure Go, no cgo)

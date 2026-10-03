@@ -1,6 +1,6 @@
 # P08: Trace Redaction Preview
 
-Status: selected for implementation
+Status: implemented in source
 
 As of: 2026-08-11
 
@@ -32,7 +32,7 @@ There is one evaluator. Preview consumes its decisions; ingest consumes its tran
 
 ## Current Grotto audit
 
-The existing implementation has the correct architectural chokepoint but a narrow policy:
+At the starting binding above, the implementation had the correct architectural chokepoint but a narrow policy:
 
 - `internal/store.InsertTrace` calls `store.Redact` before beginning the SQLite transaction. Both marks and OTLP already converge there.
 - `store.Redact` returns a deep copy and masks four value shapes: AWS access key IDs, GitHub classic PATs, OpenAI-style keys, and Slack tokens.
@@ -57,6 +57,7 @@ Only primary OpenTelemetry sources are treated as standards evidence. Local fixt
 
 - Preview is raw-content-off. Even a `retain` decision renders only a placeholder and metadata, never the candidate value.
 - GenAI prompts, completions, system instructions, tool arguments/results, and memory records are dropped by the safe default policy because they are opt-in content and likely to carry sensitive data.
+- Not yet implemented: memory-record drop rule (no rule in `default_policy_v1.json`).
 - Authorization headers, tokens, cookies, and credential-shaped values are masked. Email addresses, home-user path components, and URL query strings are masked by conservative patterns.
 - Exception messages are secret-scanned and length-bounded. Oversized values are truncated only after sensitive substrings are removed; binary values use a stable SHA-256 digest. Digests are identifiers, not anonymization guarantees.
 - Malformed JSON on a path declared as JSON, or content beyond the configured depth bound, is `UNKNOWN` and fails closed by dropping the affected attribute/subtree.
@@ -76,7 +77,7 @@ All committed examples are synthetic. Fixture matches demonstrate only the local
 - JSON-inspection path patterns;
 - rules with unique IDs, priority, path glob, optional value regex, category, action, explanation, provenance, and action parameters.
 
-Rule precedence is deterministic: highest numeric priority, then most-specific path (fewest wildcards and longest literal), then lexicographically smallest rule ID. Matching is case-insensitive for field paths and explicit for value regexes. The winning rule and precedence basis appear in every decision.
+Rule precedence is deterministic: highest numeric priority, then longest literal path, then fewest wildcards, then lexicographically smallest rule ID. Matching is case-insensitive for field paths and explicit for value regexes. The winning rule and precedence basis appear in every decision.
 
 Actions are:
 
@@ -104,6 +105,7 @@ No original value, reveal token, encryption key, reversible map, or escrow refer
 - Imported traces are decoded from an already-open read-only file descriptor and never rewritten.
 - Stored traces resolve the configured path to an absolute SQLite file URI and use `mode=ro` with normal locking, busy handling, and change detection; the path must already exist. No directory creation or migration is permitted, previews do not write the database, and a pre-span-link schema remains readable with unavailable diagnostics and links represented as empty legacy data.
 - Tests hash the source file and database plus sidecar presence/content before and after preview.
+- Current tests compare sidecar presence only; sidecar content hashing is not yet implemented.
 - The evaluator uses only Go's standard library and embedded policy bytes. It has no network client, provider, secret lookup, or environment-dependent rule fetch.
 
 ## Five-minute acceptance story
@@ -115,4 +117,4 @@ No original value, reveal token, encryption key, reversible map, or escrow refer
 5. Re-hash the inputs and confirm byte-for-byte equality.
 6. Run focused tests and the no-cgo build gate.
 
-The exact commands live in `docs/demo-redaction-preview.md` once implementation lands.
+The local imported-trace preview and verification commands live in `docs/demo-redaction-preview.md`; stored-trace non-mutation is checked in `internal/cli/redact_preview_test.go`.
