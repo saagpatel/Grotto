@@ -6,8 +6,8 @@ Local-first Go CLI + TUI that renders OpenTelemetry trace waterfalls for shell c
 ## Tech Stack
 - Go/tooling prerequisites: see [Build](README.md#build); the Go idiom guardrails below remain load-bearing.
 - CLI: Cobra 1.8+
-- TUI: Bubble Tea 0.27+ / lipgloss / bubbles
-- Tracing: OpenTelemetry Go SDK 1.30+ + OTLP proto 1.3+ + gRPC 1.66+
+- TUI: Bubble Tea 1.1+ / lipgloss / bubbles
+- Tracing: OpenTelemetry-shaped internal model + OTLP proto 1.3+ + gRPC 1.66+
 - Storage: modernc.org/sqlite 1.33+ (pure Go, NO cgo)
 
 ## Development Conventions
@@ -70,8 +70,8 @@ source-level state is not a claim about runtime or release uptake.
 
 - Go/tooling prerequisites: see [Build](README.md#build); the Go idiom guardrails below remain load-bearing.
 - CLI: Cobra 1.8+
-- TUI: Bubble Tea 0.27+ / lipgloss / bubbles
-- Tracing: OpenTelemetry Go SDK 1.30+ + OTLP proto 1.3+ + gRPC 1.66+
+- TUI: Bubble Tea 1.1+ / lipgloss / bubbles
+- Tracing: OpenTelemetry-shaped internal model + OTLP proto 1.3+ + gRPC 1.66+
 - Storage: modernc.org/sqlite 1.33+ (pure Go, NO cgo)
 
 ## How To Run
