@@ -45,16 +45,20 @@ The load-bearing design decision: **both capture paths converge on one span mode
 
 ## Build
 
-Grotto requires Go 1.22+ and has no cgo dependency. The SQLite driver is `modernc.org/sqlite` (pure Go), so the binary is fully static.
+Run these commands from the repository root. Grotto requires Go 1.25.0 or newer
+(see `go.mod`) and has no cgo dependency. The SQLite driver is `modernc.org/sqlite` (pure Go), so the binary is fully static.
 
 ```bash
 # Single binary for your current platform
 CGO_ENABLED=0 go build -o grotto ./cmd/grotto
 
-# Lint (golangci-lint 1.60+)
+# Lint (golangci-lint v2.12.2, matching .github/workflows/ci.yml)
 golangci-lint run ./...
 
-# Tests
+# Focused renderer fixture check; no receiver or existing trace database
+go test ./internal/render -run '^TestLayout_OffsetsAndWidths$'
+
+# Broader tests
 go test ./...
 ```
 

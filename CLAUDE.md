@@ -4,7 +4,7 @@
 Local-first Go CLI + TUI that renders OpenTelemetry trace waterfalls for shell commands, build scripts, and test suites — see exactly where time goes in a slow run. Zero cloud backend; everything persists to local SQLite. Built by the operator as a deliberate Go + observability gap-fill for a Platform Engineer — DX & AI Infrastructure target.
 
 ## Tech Stack
-- Go: 1.22+ (first Go project — idiom guardrails below are load-bearing)
+- Go/tooling prerequisites: see [Build](README.md#build); the Go idiom guardrails below remain load-bearing.
 - CLI: Cobra 1.8+
 - TUI: Bubble Tea 0.27+ / lipgloss / bubbles
 - Tracing: OpenTelemetry Go SDK 1.30+ + OTLP proto 1.3+ + gRPC 1.66+
@@ -68,7 +68,7 @@ source-level state is not a claim about runtime or release uptake.
 
 ## Stack
 
-- Go: 1.22+ (first Go project — idiom guardrails below are load-bearing)
+- Go/tooling prerequisites: see [Build](README.md#build); the Go idiom guardrails below remain load-bearing.
 - CLI: Cobra 1.8+
 - TUI: Bubble Tea 0.27+ / lipgloss / bubbles
 - Tracing: OpenTelemetry Go SDK 1.30+ + OTLP proto 1.3+ + gRPC 1.66+
